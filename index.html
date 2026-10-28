@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Digitale Stockkarte & Dashboard – Bienenvölker</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%23f6c445'/%3E%3Cellipse cx='32' cy='32' rx='9' ry='16' fill='%232d2a23'/%3E%3Cellipse cx='24' cy='26' rx='7' ry='4' fill='%23fff' opacity='0.9'/%3E%3Cellipse cx='40' cy='38' rx='7' ry='4' fill='%23fff' opacity='0.9'/%3E%3C/svg%3E">
+<!-- Leaflet CSS für die interaktive Karte -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+<style>
+  :root {
+    --gelb: #f6c445;
+    --honig: #e8a723;
+    --dunkel: #2d2a23;
+    --grau: #f4f1ea;
+    --gruen: #2e7d32;
+    --rot: #b3261e;
+    --blau: #1f6f8b;
+    --kartenrand: #e3dccb;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+    margin: 0;
+    background: var(--grau);
+    color: var(--dunkel);
+    line-height: 1.5;
+  }
+
+  /* ---------- Hero ---------- */
+  .hero {
+    position: relative;
+    background:
+      linear-gradient(120deg, rgba(24, 20, 10, .82) 0%, rgba(24, 20, 10, .55) 45%, rgba(24, 20, 10, .25) 100%),
+      url("https://thumb.wikimedia.org/wikipedia/commons/thumb/c/cc/Beekeeping_in_a_bee_suit_while_holding_a_honeycomb_from_a_beehive.jpg/1920px-Beekeeping_in_a_bee_suit_while_holding_a_honeycomb_from_a_beehive.jpg") center 38% / cover no-repeat,
+      #4a3f22;
+    background-color: #4a3f22;
+    color: #fff;
+    padding: 36px 20px 40px;
+    border-bottom: 5px solid var(--gelb);
+  }
+
+  .hero-inhalt {
+    max-width: 1160px;
+    margin: 0 auto;
+    position: relative;
+    z-index: 1;
+  }
+
+  .hero h1 {
+    margin: 0 0 8px;
+    font-size: clamp(22px, 4vw, 34px);
+    letter-spacing: .3px;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, .45);
+  }
+
+  .hero p {
+    margin: 0;
+    font-size: clamp(14px, 2vw, 16px);
+    max-width: 620px;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, .5);
+  }
+
+  .hero-badge {
+    display: inline-block;
+    margin-top: 14px;
+    background: rgba(246, 196, 69, .92);
+    color: var(--dunkel);
+    font-size: 12px;
+    font-weight: 700;
+    padding: 5px 12px;
+    border-radius: 999px;
+    letter-spacing: .4px;
+  }
+
+  /* ---------- Reiter-Navigation ---------- */
+  .tab-nav {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: var(--dunkel);
+    box-shadow: 0 3px 10px rgba(0, 0, 0, .25);
+    display: flex;
+    align-items: center;
+  }
+
+  .tab-nav-inhalt {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    gap: 4px;
+    padding: 8px 14px;
+    flex: 1;
+    min-width: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .tab-nav button {
+    white-space: nowrap;
+    background: transparent;
+    color: #d8d2c2;
+    border: 0;
+    border-radius: 8px;
+    padding: 9px 14px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background .15s ease, color .15s ease;
+  }
+
+  .tab-nav button:hover {
+    background: rgba(246, 196, 69, .18);
+    color: #fff;
+  }
+
+  .tab-nav button.active {
+    background: var(--gelb);
+    color: var(--dunkel);
+  }
+
+  .sync-badge {
+    flex-shrink: 0;
+    margin-right: 14px;
+    padding: 6px 13px;
+    border-radius: 999px;
+    font-size: 12.5px;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+    color: #d8d2c2;
+    background: rgba(255, 255, 255, .12);
+  }
+
+  .sync-badge.ok { background: #2e7d43; color: #fff; }
+  .sync-badge.offen { background: #e8a200; color: #2d2a23; }
+  .sync-badge.fehler { background: #c0392b; color: #fff; }
+
+  main {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 22px 18px 10px;
+  }
+
+  .card {
+    background: #fff;
+    border: 1px solid var(--kartenrand);
+    border-radius: 12px;
+    padding: 18px 18px 16px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(45, 42, 35, .05), 0 8px 20px rgba(45, 42, 35, .06);
+  }
+
+  h2 { margin-top: 0; font-size: 19px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  h3 { margin-bottom: 8px; font-size: 16px; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(175px, 1fr)); gap: 12px; }
+
+  .kpi {
+    background: linear-gradient(180deg, #fffdf3, #fbf4de);
+    border: 1px solid #e6d9b4;
+    border-left: 4px solid var(--honig);
+    border-radius: 10px;
+    padding: 12px 14px;
+  }
+
+  .kpi strong { display: block; font-size: 22px; margin-top: 4px; color: var(--dunkel); }
+  .kpi small { color: #7a7057; font-weight: 600; text-transform: uppercase; font-size: 11px; }
+
+  #mapAuswahl, #standortUebersichtKarte {
+    width: 100%; height: 320px; border-radius: 8px; border: 1px solid #b9b2a3; margin-top: 8px; z-index: 10;
+  }
+
+  .dashboard-kopf { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; }
+  .dashboard-kopf img { width: 74px; height: 74px; object-fit: cover; border-radius: 12px; border: 3px solid var(--gelb); flex-shrink: 0; }
+
+  label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+  input, select, textarea {
+    width: 100%; padding: 9px; border: 1px solid #b9b2a3; border-radius: 7px; font-size: 14px; background: #fff;
+  }
+
+  textarea { min-height: 80px; resize: vertical; }
+
+  button {
+    border: 0; border-radius: 7px; padding: 10px 16px; font-size: 14px; font-weight: 700; cursor: pointer; background: var(--dunkel); color: #fff;
+  }
+
+  button.secondary { background: #e9e2d0; color: var(--dunkel); }
+  button.danger { background: var(--rot); }
+  button.green { background: var(--gruen); }
+
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { border-bottom: 1px solid #e6e0d0; padding: 9px 8px; text-align: left; vertical-align: top; }
+  th { background: #efe8d2; font-size: 12px; text-transform: uppercase; }
+
+  .hidden { display: none; }
+  .small { font-size: 12px; color: #7a7057; }
+
+  .volk-card-item { display: flex; gap: 8px; margin-bottom: 10px; }
+  .volk-btn {
+    flex: 1; text-align: left; background: #fff; color: var(--dunkel); border: 1px solid #cfc7ae; border-radius: 10px; padding: 12px 14px;
+  }
+  .volk-btn.active { border-color: var(--honig); box-shadow: inset 5px 0 0 var(--gelb); }
+
+  .chart-box { position: relative; width: 100%; height: 320px; }
+  canvas { width: 100%; height: 100%; display: block; }
+
+  .ampel { border-left: 6px solid #6a6455; padding: 14px; margin-top: 14px; border-radius: 0 10px 10px 0; }
+  .ampel-badge { display: inline-block; padding: 4px 10px; border-radius: 999px; font-weight: 800; }
+  .warnung { border-left: 5px solid var(--rot); background: #fff3f2; padding: 10px 12px; margin-top: 12px; }
+  .hinweis { border-left: 5px solid var(--blau); background: #f0f8fb; padding: 10px 12px; margin-top: 12px; }
+
+  .bildkarte { display: grid; grid-template-columns: 260px 1fr; gap: 16px; align-items: center; }
+  .bildkarte img { width: 100%; height: 190px; object-fit: cover; border-radius: 12px; border: 1px solid var(--kartenrand); }
+
+  @media (max-width: 700px) { .bildkarte { grid-template-columns: 1fr; } }
+
+  dialog { max-width: 780px; width: calc(100% - 32px); border: 0; border-radius: 14px; padding: 0; }
+  .dialog-inhalt { padding: 22px; }
+  
+  footer { max-width: 1200px; margin: 30px auto; padding: 0 18px; font-size: 11px; }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="hero-inhalt">
+    <span class="hero-badge" style="margin-top:0;margin-bottom:14px">🐝 Imkerei digital</span>
+    <h1>Digitale Stockkarte & Dashboard</h1>
+    <p>Verwalte deine Bienenvölker, Durchsichten und Königinnen – synchronisiert in Echtzeit zwischen PC und Smartphone.</p>
+    <span class="hero-badge">☁️ Live Cloud-Synchronisation aktiv</span>
+  </div>
+</header>
+
+<nav class="tab-nav no-print">
+  <div class="tab-nav-inhalt">
+    <button type="button" data-reiter="dashboard" class="active" onclick="zeigeReiter('dashboard')">📊 Dashboard</button>
+    <button type="button" data-reiter="standorte" onclick="zeigeReiter('standorte')">📍 Standorte</button>
+    <button type="button" data-reiter="stockkarte" onclick="zeigeReiter('stockkarte')">🏠 Stockkarte & Durchsichten</button>
+    <button type="button" data-reiter="herkunft" onclick="zeigeReiter('herkunft')">👑 Herkunft & Abstammung</button>
+    <button type="button" data-reiter="behandlung" onclick="zeigeReiter('behandlung')">🧪 Varroa & Behandlung</button>
+    <button type="button" data-reiter="fuetterung" onclick="zeigeReiter('fuetterung')">🍯 Fütterung</button>
+    <button type="button" data-reiter="sync" onclick="zeigeReiter('sync')">⚙️ Sync & Cloud</button>
+  </div>
+  <div id="syncBadge" class="sync-badge ok">☁️ Cloud verbunden</div>
+</nav>
+
+<main>
+
+  <!-- ================= Reiter: Dashboard ================= -->
+  <section id="reiter-dashboard" class="reiter">
+    <section class="card">
+      <h2>📊 Gesamtübersicht</h2>
+      <div class="kpi-grid" id="gesamtKpi"></div>
+      <div id="gesamtHinweise"></div>
+    </section>
+
+    <section class="card">
+      <div class="bildkarte">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fd/Apiary_-_geograph.org.uk_-_63605.jpg/1280px-Apiary_-_geograph.org.uk_-_63605.jpg" alt="Bienenstand">
+        <div>
+          <h2>Vergleich aller Völker</h2>
+          <div style="overflow-x:auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>Volk</th>
+                  <th>Standort</th>
+                  <th>Letzte Durchsicht</th>
+                  <th>Stärke</th>
+                  <th>Futter</th>
+                  <th>Varroa / Tag</th>
+                  <th>Trend</th>
+                  <th>Ampel</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="vergleichTabelle"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <h3 style="margin-top:24px">Varroa-Verlauf aller Völker</h3>
+      <div class="chart-box" style="height:400px">
+        <canvas id="vergleichChart"></canvas>
+      </div>
+      <div id="vergleichLegende" class="legende"></div>
+    </section>
+  </section>
+
+  <!-- ================= Reiter: Standorte ================= -->
+  <section id="reiter-standorte" class="reiter hidden">
+    <section class="card">
+      <h2 id="standortFormTitel">➕ Bienenstand anlegen</h2>
+      <div class="grid">
+        <div>
+          <label for="sName">Standort-Bezeichnung *</label>
+          <input id="sName" placeholder="z. B. Garten Ludwigsburg">
+        </div>
+        <div>
+          <label for="sLat">Breitengrad (GPS)</label>
+          <input type="number" step="0.000001" id="sLat" readonly>
+        </div>
+        <div>
+          <label for="sLng">Längengrad (GPS)</label>
+          <input type="number" step="0.000001" id="sLng" readonly>
+        </div>
+      </div>
+      <div id="mapAuswahl"></div>
+      <div class="actions">
+        <button class="green" id="sSpeichernBtn" onclick="standortSpeichern()">Standort speichern</button>
+        <button class="secondary hidden" id="sAbbrechenBtn" onclick="standortBearbeitenAbbrechen()">Abbrechen</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>📍 Meine Bienenstände</h2>
+      <div id="standortListe"></div>
+    </section>
+
+    <section class="card">
+      <h2>🗺️ Übersichtskarte aller Stände</h2>
+      <div id="standortUebersichtKarte"></div>
+    </section>
+  </section>
+
+  <!-- ================= Reiter: Stockkarte ================= -->
+  <section id="reiter-stockkarte" class="reiter hidden">
+    <section class="card">
+      <h2 id="volkFormTitel">➕ Volk anlegen</h2>
+      <div class="grid">
+        <div>
+          <label for="vName">Volksnummer / Name *</label>
+          <input id="vName" placeholder="z. B. Volk 01">
+        </div>
+        <div>
+          <label for="vStandort">Standort</label>
+          <select id="vStandort"><option value="">– bitte wählen –</option></select>
+        </div>
+        <div>
+          <label for="vBeute">Beute / Rähmchenmaß</label>
+          <input id="vBeute" placeholder="z. B. Zander">
+        </div>
+        <div>
+          <label for="vKoenigin">Königin Zeichen / Jahrgang</label>
+          <input id="vKoenigin" placeholder="z. B. Blau 2025">
+        </div>
+      </div>
+      <div class="actions">
+        <button class="green" id="vSpeichernBtn" onclick="volkSpeichern()">Volk speichern</button>
+        <button class="secondary hidden" id="vAbbrechenBtn" onclick="volkBearbeitenAbbrechen()">Abbrechen</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>🏠 Meine Völker</h2>
+      <div id="volkListe"></div>
+    </section>
+
+    <section id="volkBereich" class="hidden">
+      <section class="card">
+        <div class="dashboard-kopf">
+          <img src="https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ae/Western_honey_bee_on_a_honeycomb.jpg/1280px-Western_honey_bee_on_a_honeycomb.jpg" alt="Biene">
+          <div>
+            <h2 id="volkTitel">Dashboard</h2>
+            <span id="volkInfo" class="small"></span>
+          </div>
+        </div>
+        <div class="kpi-grid" id="kpiBereich"></div>
+        <div id="warnBereich"></div>
+        <div class="chart-box"><canvas id="varroaChart"></canvas></div>
+      </section>
+
+      <section class="card">
+        <h2>📝 Neue Durchsicht</h2>
+        <div class="grid">
+          <div><label for="dDatum">Datum</label><input type="date" id="dDatum"></div>
+          <div><label for="dWetter">Wetter / Temp.</label><input id="dWetter"></div>
+          <div>
+            <label for="dStaerke">Volksstärke</label>
+            <select id="dStaerke"><option value="">– wählen –</option><option>Schwach</option><option>Mittel</option><option>Stark</option><option>Sehr stark</option></select>
+          </div>
+          <div>
+            <label for="dBrut">Brutbild</label>
+            <select id="dBrut"><option value="">– wählen –</option><option>Keine Brut</option><option>Brut vorhanden</option><option>Geschlossenes Brutbild</option><option>Lückig</option></select>
+          </div>
+          <div>
+            <label for="dKoenigin">Königin / Stifte</label>
+            <select id="dKoenigin"><option value="">– wählen –</option><option>Königin gesehen</option><option>Stifte gesehen</option><option>Weiselzellen</option><option>Verdacht weisellos</option></select>
+          </div>
+          <div>
+            <label for="dFutter">Futtervorrat</label>
+            <select id="dFutter"><option value="">– wählen –</option><option>Sehr wenig</option><option>Ausreichend</option><option>Gut</option><option>Sehr gut</option></select>
+          </div>
+          <div><label for="dVarroa">Varroa: Milben/Tag</label><input type="number" step="0.1" id="dVarroa"></div>
+        </div>
+        <div style="margin-top:12px"><label for="dBemerkung">Bemerkungen</label><textarea id="dBemerkung"></textarea></div>
+        <div class="actions">
+          <button class="green" onclick="durchsichtSpeichern()">Durchsicht speichern</button>
+          <button class="danger" onclick="volkLoeschen()">Volk löschen</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>📚 Durchsichten</h2>
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr><th>Datum</th><th>Stärke</th><th>Brut</th><th>Königin</th><th>Futter</th><th>Varroa</th><th>Ampel</th><th>Bemerkung</th><th></th></tr></thead>
+            <tbody id="durchsichten"></tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+  </section>
+
+  <!-- ================= Reiter: Herkunft & Abstammung ================= -->
+  <section id="reiter-herkunft" class="reiter hidden">
+    <section class="card">
+      <h2>👑 Volk auswählen</h2>
+      <select id="hVolk" onchange="herkunftVolkGewaehlt()"></select>
+    </section>
+
+    <section id="herkunftBereich" class="hidden">
+      <section class="card">
+        <h2 id="herkunftTitelForm">👑 Herkunft & Zuchtdaten</h2>
+        <div class="grid">
+          <div><label for="hMuttervolk">Muttervolk / Abstammung</label><input id="hMuttervolk"></div>
+          <div><label for="hRasse">Rasse / Linie</label><input id="hRasse" placeholder="Carnica, Buckfast..."></div>
+          <div><label for="hSchlupfdatum">Schlupfdatum</label><input type="date" id="hSchlupfdatum"></div>
+          <div><label for="hBegattungsart">Begattungsart</label><input id="hBegattungsart" placeholder="Standbegattet, Belegstelle..."></div>
+          <div><label for="hBelegstelle">Belegstelle Name</label><input id="hBelegstelle"></div>
+          <div><label for="hZuechter">Züchter / Herkunft</label><input id="hZuechter"></div>
+        </div>
+        <div style="margin-top:12px"><label for="hBemerkung">Zuchtwert-Notizen</label><textarea id="hBemerkung"></textarea></div>
+        <div class="actions"><button class="green" onclick="herkunftSpeichern()">Speichern</button></div>
+      </section>
+
+      <section class="card">
+        <h2>📜 Stammbaum-Übersicht aller Völker</h2>
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr><th>Volk</th><th>Muttervolk</th><th>Rasse</th><th>Begattung</th><th>Belegstelle</th><th>Züchter</th><th>Notizen</th></tr></thead>
+            <tbody id="herkunftGesamtTabelle"></tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+  </section>
+
+  <!-- ================= Reiter: Varroa & Behandlung ================= -->
+  <section id="reiter-behandlung" class="reiter hidden">
+    <section class="card">
+      <h2>🧪 Volk auswählen</h2>
+      <select id="bVolk" onchange="behandlungVolkGewaehlt()"></select>
+    </section>
+
+    <section id="behandlungBereich" class="hidden">
+      <section class="card">
+        <h2>➕ Behandlung eintragen</h2>
+        <div class="grid">
+          <div><label for="bMittel">Behandlungsmittel</label><input id="bMittel" placeholder="Ameisensäure, Oxalsäure..."></div>
+          <div><label for="bBeginn">Beginn</label><input type="date" id="bBeginn"></div>
+          <div><label for="bEnde">Ende</label><input type="date" id="bEnde"></div>
+          <div><label for="bDosierung">Dosierung</label><input id="bDosierung"></div>
+        </div>
+        <div style="margin-top:12px"><label for="bBemerkung">Bemerkungen</label><textarea id="bBemerkung"></textarea></div>
+        <div class="actions"><button class="green" onclick="behandlungSpeichern()">Behandlung speichern</button></div>
+      </section>
+
+      <section class="card">
+        <h2>Behandlungen</h2>
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr><th>Beginn</th><th>Ende</th><th>Mittel</th><th>Dosierung</th><th>Bemerkung</th><th></th></tr></thead>
+            <tbody id="behandlungen"></tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+  </section>
+
+  <!-- ================= Reiter: Fütterung ================= -->
+  <section id="reiter-fuetterung" class="reiter hidden">
+    <section class="card">
+      <h2>🍯 Volk auswählen</h2>
+      <select id="fVolk" onchange="fuetterungVolkGewaehlt()"></select>
+    </section>
+
+    <section id="fuetterungBereich" class="hidden">
+      <section class="card">
+        <h2>➕ Fütterung eintragen</h2>
+        <div class="grid">
+          <div><label for="fDatum">Datum</label><input type="date" id="fDatum"></div>
+          <div><label for="fMenge">Menge (kg)</label><input type="number" step="0.5" id="fMenge"></div>
+          <div><label for="fForm">Futterform</label><input id="fForm" placeholder="ApiInvert, Zucker 3:2..."></div>
+        </div>
+        <div style="margin-top:12px"><label for="fBemerkung">Bemerkungen</label><textarea id="fBemerkung"></textarea></div>
+        <div class="actions"><button class="green" onclick="fuetterungSpeichern()">Fütterung speichern</button></div>
+      </section>
+
+      <section class="card">
+        <h2>Fütterungen</h2>
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr><th>Datum</th><th>Menge (kg)</th><th>Futterform</th><th>Bemerkung</th><th></th></tr></thead>
+            <tbody id="fuetterungen"></tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+  </section>
+
+  <!-- ================= Reiter: Sync & Cloud ================= -->
+  <section id="reiter-sync" class="reiter hidden">
+    <section class="card">
+      <h2>☁️ Firebase Live-Cloud Synchronisation</h2>
+      <p>Deine Stockkarte synchronisiert alle Eingaben automatisch über Google Firebase in Echtzeit. Jede Änderung am Handy erscheint sofort am PC.</p>
+      <div id="cloudStatusText" class="hinweis">Status: Verbindung zur Cloud wird aufgebaut...</div>
+    </section>
+
+    <section class="card">
+      <h2>💾 Manuelles Backup (Export / Import)</h2>
+      <div class="actions">
+        <button class="secondary" onclick="exportJson()">Backup herunterladen (.json)</button>
+        <button class="secondary" onclick="document.getElementById('importDatei').click()">Backup einspielen</button>
+      </div>
+      <input type="file" id="importDatei" accept=".json" class="hidden" onchange="importJson(event)">
+    </section>
+  </section>
+
+</main>
+
+<footer>
+  <p class="small">Digitale Stockkarte mit Firebase Realtime Database Integration.</p>
+</footer>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<!-- Firebase SDK Module -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+  import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+  // =========================================================================
+  // HIER DEINE FIREBASE ZUGANGSDATEN EINSETZEN (aus Schritt 1.4):
+  // =========================================================================
+const firebaseConfig = {
+  apiKey: "AIzaSy...",
+  authDomain: "bienenbuch.firebaseapp.com",
+  databaseURL: "https://bienenbuch-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "bienenbuch",
+  storageBucket: "bienenbuch.appspot.com",
+  messagingSenderId: "123456...",
+  appId: "1:123456..."
+};
+
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+  const datenRef = ref(db, 'stockkarte_daten');
+
+  // Globale Datenstruktur
+  window.daten = { voelker: [], standorte: [] };
+
+  // Bei Änderungen in der Cloud automatisch die Anzeige auf der Website aktualisieren
+  onValue(datenRef, (snapshot) => {
+    const cloudDaten = snapshot.val();
+    if (cloudDaten) {
+      window.daten = cloudDaten;
+    } else {
+      window.daten = { voelker: [], standorte: [] };
+    }
+    window.datenstrukturAbsichern();
+    window.alleAnzeigen();
+    document.getElementById("syncBadge").textContent = "☁️ Live synchronisiert";
+    document.getElementById("syncBadge").className = "sync-badge ok";
+    document.getElementById("cloudStatusText").textContent = "Erfolgreich mit der Cloud verbunden. Alle Daten sind aktuell.";
+  });
+
+  // Funktion zum Speichern in der Cloud
+  window.speichern = function() {
+    set(datenRef, window.daten).then(() => {
+      console.log("Erfolgreich in Cloud gespeichert!");
+    }).catch((err) => {
+      alert("Fehler beim Cloud-Speichern: " + err.message);
+    });
+  };
+</script>
+
+<script>
+let aktivesVolk = null;
+let aktuellerReiter = "dashboard";
+
+function datenstrukturAbsichern() {
+  if (!Array.isArray(daten.standorte)) daten.standorte = [];
+  if (!Array.isArray(daten.voelker)) daten.voelker = [];
+  daten.voelker.forEach(volk => {
+    if (!Array.isArray(volk.durchsichten)) volk.durchsichten = [];
+    if (!Array.isArray(volk.behandlungen)) volk.behandlungen = [];
+    if (!Array.isArray(volk.fuetterungen)) volk.fuetterungen = [];
+    if (!volk.herkunft) volk.herkunft = {};
+  });
+}
+
+function zeigeReiter(name) {
+  aktuellerReiter = name;
+  document.querySelectorAll(".reiter").forEach(r => r.classList.add("hidden"));
+  const b = document.getElementById("reiter-" + name);
+  if (b) b.classList.remove("hidden");
+
+  document.querySelectorAll(".tab-nav button").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.reiter === name);
+  });
+
+  if (name === "dashboard") { vergleichAnzeigen(); gesamtUebersichtAnzeigen(); }
+  else if (name === "standorte") { standorteAnzeigen(); initMapAuswahl(); initMapUebersicht(); }
+  else if (name === "herkunft") { aktualisiereVolkAuswahl(); herkunftGesamtTabelleAnzeigen(); }
+}
+
+function heute() { return new Date().toISOString().slice(0, 10); }
+
+/* ---------- Standorte ---------- */
+let mapAuswahl = null, markerAuswahl = null, mapUebersicht = null, uebersichtMarkerEbene = null;
+
+function initMapAuswahl() {
+  setTimeout(() => {
+    if (!mapAuswahl) {
+      mapAuswahl = L.map('mapAuswahl').setView([51.1657, 10.4515], 6);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mapAuswahl);
+      mapAuswahl.on('click', e => {
+        document.getElementById("sLat").value = e.latlng.lat.toFixed(6);
+        document.getElementById("sLng").value = e.latlng.lng.toFixed(6);
+        if (markerAuswahl) markerAuswahl.setLatLng(e.latlng);
+        else markerAuswahl = L.marker(e.latlng).addTo(mapAuswahl);
+      });
+    }
+  }, 150);
+}
+
+function initMapUebersicht() {
+  setTimeout(() => {
+    if (!mapUebersicht) {
+      mapUebersicht = L.map('standortUebersichtKarte').setView([51.1657, 10.4515], 6);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mapUebersicht);
+      uebersichtMarkerEbene = L.layerGroup().addTo(mapUebersicht);
+    }
+    aktualisiereUebersichtKarte();
+  }, 150);
+}
+
+function aktualisiereUebersichtKarte() {
+  if (!uebersichtMarkerEbene) return;
+  uebersichtMarkerEbene.clearLayers();
+  daten.standorte.forEach(st => {
+    if (st.lat && st.lng) {
+      L.marker([st.lat, st.lng]).bindPopup(`<b>${escapeHtml(st.name)}</b>`).addTo(uebersichtMarkerEbene);
+    }
+  });
+}
+
+function standortSpeichern() {
+  const name = document.getElementById("sName").value.trim();
+  if (!name) return alert("Bitte Standort-Namen eingeben.");
+  daten.standorte.push({ id: Date.now(), name, lat: document.getElementById("sLat").value, lng: document.getElementById("sLng").value });
+  document.getElementById("sName").value = "";
+  speichern();
+  alleAnzeigen();
+}
+
+function standorteAnzeigen() {
+  const l = document.getElementById("standortListe");
+  if (!daten.standorte.length) return l.innerHTML = "<p>Noch keine Standorte.</p>";
+  l.innerHTML = "<table>" + daten.standorte.map(s => `<tr><td><b>${escapeHtml(s.name)}</b></td><td><button class="danger" onclick="standortLoeschen(${s.id})">✕</button></td></tr>`).join("") + "</table>";
+}
+
+function standortLoeschen(id) {
+  daten.standorte = daten.standorte.filter(s => s.id !== id);
+  speichern();
+  alleAnzeigen();
+}
+
+function aktualisiereStandortAuswahl() {
+  const sel = document.getElementById("vStandort");
+  if (!sel) return;
+  sel.innerHTML = '<option value="">– bitte wählen –</option>' + daten.standorte.map(s => `<option value="${escapeHtml(s.name)}">${escapeHtml(s.name)}</option>`).join("");
+}
+
+/* ---------- Völker & Stockkarte ---------- */
+function volkSpeichern() {
+  const name = document.getElementById("vName").value.trim();
+  if (!name) return alert("Name erforderlich.");
+  daten.voelker.push({
+    id: Date.now(), name, standort: document.getElementById("vStandort").value,
+    beute: document.getElementById("vBeute").value, koenigin: document.getElementById("vKoenigin").value,
+    durchsichten: [], behandlungen: [], fuetterungen: [], herkunft: {}
+  });
+  document.getElementById("vName").value = "";
+  speichern();
+  alleAnzeigen();
+}
+
+function listeAnzeigen() {
+  const l = document.getElementById("volkListe");
+  if (!daten.voelker.length) return l.innerHTML = "<p>Noch keine Völker.</p>";
+  l.innerHTML = daten.voelker.map(v => `
+    <div class="volk-card-item">
+      <button class="volk-btn ${aktivesVolk === v.id ? 'active' : ''}" onclick="volkOeffnen(${v.id})">
+        <strong>${escapeHtml(v.name)}</strong>
+        <span class="small">Standort: ${escapeHtml(v.standort || "–")}</span>
+      </button>
+    </div>
+  `).join("");
+}
+
+function volkOeffnen(id) {
+  aktivesVolk = id;
+  const volk = daten.voelker.find(v => v.id === id);
+  zeigeReiter("stockkarte");
+  document.getElementById("volkBereich").classList.remove("hidden");
+  document.getElementById("volkTitel").textContent = "Dashboard: " + volk.name;
+  document.getElementById("dDatum").value = heute();
+  dashboardAnzeigen();
+  durchsichtenAnzeigen();
+  listeAnzeigen();
+}
+
+function aktualisiereVolkAuswahl() {
+  ["bVolk", "fVolk", "hVolk"].forEach(id => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    sel.innerHTML = daten.voelker.map(v => `<option value="${v.id}">${escapeHtml(v.name)}</option>`).join("");
+  });
+  behandlungVolkGewaehlt();
+  fuetterungVolkGewaehlt();
+  herkunftVolkGewaehlt();
+}
+
+function gesamtUebersichtAnzeigen() {
+  document.getElementById("gesamtKpi").innerHTML = `
+    <div class="kpi"><small>Völker</small><strong>${daten.voelker.length}</strong></div>
+    <div class="kpi"><small>Standorte</small><strong>${daten.standorte.length}</strong></div>
+  `;
+}
+
+function dashboardAnzeigen() {
+  const volk = daten.voelker.find(v => v.id === aktivesVolk);
+  if (!volk) return;
+  document.getElementById("kpiBereich").innerHTML = `
+    <div class="kpi"><small>Durchsichten</small><strong>${volk.durchsichten.length}</strong></div>
+  `;
+}
+
+/* ---------- Durchsichten ---------- */
+function durchsichtSpeichern() {
+  const volk = daten.voelker.find(v => v.id === aktivesVolk);
+  if (!volk) return;
+  volk.durchsichten.unshift({
+    datum: document.getElementById("dDatum").value || heute(),
+    wetter: document.getElementById("dWetter").value,
+    staerke: document.getElementById("dStaerke").value,
+    brut: document.getElementById("dBrut").value,
+    koenigin: document.getElementById("dKoenigin").value,
+    futter: document.getElementById("dFutter").value,
+    varroa: document.getElementById("dVarroa").value,
+    bemerkung: document.getElementById("dBemerkung").value
+  });
+  speichern();
+  dashboardAnzeigen();
+  durchsichtenAnzeigen();
+}
+
+function durchsichtenAnzeigen() {
+  const volk = daten.voelker.find(v => v.id === aktivesVolk);
+  const tb = document.getElementById("durchsichten");
+  if (!volk || !volk.durchsichten.length) return tb.innerHTML = "<tr><td colspan='9'>Keine Durchsichten.</td></tr>";
+  tb.innerHTML = volk.durchsichten.map((d, i) => `
+    <tr>
+      <td>${d.datum}</td><td>${escapeHtml(d.staerke)}</td><td>${escapeHtml(d.brut)}</td>
+      <td>${escapeHtml(d.koenigin)}</td><td>${escapeHtml(d.futter)}</td><td>${d.varroa || "–"}</td>
+      <td>🟢</td><td>${escapeHtml(d.bemerkung)}</td>
+      <td><button class="danger" onclick="durchsichtLoeschen(${i})">✕</button></td>
+    </tr>
+  `).join("");
+}
+
+function durchsichtLoeschen(i) {
+  const volk = daten.voelker.find(v => v.id === aktivesVolk);
+  if (volk && confirm("Löschen?")) { volk.durchsichten.splice(i, 1); speichern(); durchsichtenAnzeigen(); }
+}
+
+function volkLoeschen() {
+  if (confirm("Volk wirklich löschen?")) {
+    daten.voelker = daten.voelker.filter(v => v.id !== aktivesVolk);
+    aktivesVolk = null;
+    speichern();
+    document.getElementById("volkBereich").classList.add("hidden");
+    alleAnzeigen();
+  }
+}
+
+/* ---------- Herkunft ---------- */
+function herkunftVolkGewaehlt() {
+  const id = Number(document.getElementById("hVolk").value);
+  const volk = daten.voelker.find(v => v.id === id);
+  if (!volk) return;
+  document.getElementById("herkunftBereich").classList.remove("hidden");
+  const h = volk.herkunft || {};
+  document.getElementById("hMuttervolk").value = h.muttervolk || "";
+  document.getElementById("hRasse").value = h.rasse || "";
+  document.getElementById("hSchlupfdatum").value = h.schlupfdatum || "";
+  document.getElementById("hBegattungsart").value = h.begattungsart || "";
+  document.getElementById("hBelegstelle").value = h.belegstelle || "";
+  document.getElementById("hZuechter").value = h.zuechter || "";
+  document.getElementById("hBemerkung").value = h.bemerkung || "";
+}
+
+function herkunftSpeichern() {
+  const id = Number(document.getElementById("hVolk").value);
+  const volk = daten.voelker.find(v => v.id === id);
+  if (!volk) return;
+  volk.herkunft = {
+    muttervolk: document.getElementById("hMuttervolk").value,
+    rasse: document.getElementById("hRasse").value,
+    schlupfdatum: document.getElementById("hSchlupfdatum").value,
+    begattungsart: document.getElementById("hBegattungsart").value,
+    belegstelle: document.getElementById("hBelegstelle").value,
+    zuechter: document.getElementById("hZuechter").value,
+    bemerkung: document.getElementById("hBemerkung").value
+  };
+  speichern();
+  herkunftGesamtTabelleAnzeigen();
+  alert("Herkunft gespeichert!");
+}
+
+function herkunftGesamtTabelleAnzeigen() {
+  const tb = document.getElementById("herkunftGesamtTabelle");
+  if (!tb) return;
+  tb.innerHTML = daten.voelker.map(v => {
+    const h = v.herkunft || {};
+    return `<tr><td><b>${escapeHtml(v.name)}</b></td><td>${escapeHtml(h.muttervolk||"–")}</td><td>${escapeHtml(h.rasse||"–")}</td><td>${escapeHtml(h.begattungsart||"–")}</td><td>${escapeHtml(h.belegstelle||"–")}</td><td>${escapeHtml(h.zuechter||"–")}</td><td>${escapeHtml(h.bemerkung||"–")}</td></tr>`;
+  }).join("");
+}
+
+/* ---------- Behandlung & Fütterung ---------- */
+function behandlungVolkGewaehlt() { document.getElementById("behandlungBereich").classList.remove("hidden"); behandlungenAnzeigen(); }
+function behandlungSpeichern() {
+  const id = Number(document.getElementById("bVolk").value);
+  const volk = daten.voelker.find(v => v.id === id);
+  if (!volk) return;
+  volk.behandlungen.unshift({
+    beginn: document.getElementById("bBeginn").value || heute(), ende: document.getElementById("bEnde").value,
+    mittel: document.getElementById("bMittel").value, dosierung: document.getElementById("bDosierung").value,
+    bemerkung: document.getElementById("bBemerkung").value
+  });
+  speichern(); behandlungenAnzeigen();
+}
+function behandlungenAnzeigen() {
+  const id = Number(document.getElementById("bVolk").value);
+  const volk = daten.voelker.find(v => v.id === id);
+  const tb = document.getElementById("behandlungen");
+  if (!volk || !volk.behandlungen.length) return tb.innerHTML = "<tr><td colspan='6'>Keine Behandlungen.</td></tr>";
+  tb.innerHTML = volk.behandlungen.map((b, i) => `<tr><td>${b.beginn}</td><td>${b.ende||"–"}</td><td>${escapeHtml(b.mittel)}</td><td>${escapeHtml(b.dosierung)}</td><td>${escapeHtml(b.bemerkung)}</td><td><button class="danger" onclick="behandlungLoeschen(${i})">✕</button></td></tr>`).join("");
+}
+function behandlungLoeschen(i) {
+  const id = Number(document.getElementById("bVolk").value);
+  const volk = daten.voelker.find(v => v.id === id);
+  if (volk && confirm("Löschen?")) { volk.behandlungen.splice(i, 1); speichern(); behandlungenAnzeigen(); }
+}
+
+function fuetterungVolkGewaehlt() { document.getElementById("fuetterungBereich").classList.remove("hidden"); fuetterungenAnzeigen(); }
+function fuetterungSpeichern() {
+  const id = Number(document.getElementById("fVolk").value);
+  const volk = daten.voelker.find(v => v.id === id);
+  if (!volk) return;
+  volk.fuetterungen.unshift({
+    datum: document.getElementById("fDatum").value || heute(), menge: document.getElementById("fMenge").value,
+    form: document.getElementById("fForm").value, bemerkung: document.getElementById("fBemerkung").value
+  });
+  speichern(); fuetterungenAnzeigen();
+}
+function fuetterungenAnzeigen() {
+  const id = Number(document.getElementById("fVolk").value);
+  const volk = daten.voelker.find(v => v.id === id);
+  const tb = document.getElementById("fuetterungen");
+  if (!volk || !volk.fuetterungen.length) return tb.innerHTML = "<tr><td colspan='5'>Keine Fütterungen.</td></tr>";
+  tb.innerHTML = volk.fuetterungen.map((f, i) => `<tr><td>${f.datum}</td><td>${f.menge} kg</td><td>${escapeHtml(f.form)}</td><td>${escapeHtml(f.bemerkung)}</td><td><button class="danger" onclick="fuetterungLoeschen(${i})">✕</button></td></tr>`).join("");
+}
+function fuetterungLoeschen(i) {
+  const id = Number(document.getElementById("fVolk").value);
+  const volk = daten.voelker.find(v => v.id === id);
+  if (volk && confirm("Löschen?")) { volk.fuetterungen.splice(i, 1); speichern(); fuetterungenAnzeigen(); }
+}
+
+function vergleichAnzeigen() {}
+
+function alleAnzeigen() {
+  listeAnzeigen();
+  aktualisiereStandortAuswahl();
+  standorteAnzeigen();
+  aktualisiereVolkAuswahl();
+  gesamtUebersichtAnzeigen();
+  herkunftGesamtTabelleAnzeigen();
+}
+
+function exportJson() {
+  const blob = new Blob([JSON.stringify(daten, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "stockkarte-backup-" + heute() + ".json";
+  a.click();
+}
+
+function importJson(e) {
+  const datei = e.target.files[0];
+  if (!datei) return;
+  const reader = new FileReader();
+  reader.onload = evt => {
+    try {
+      daten = JSON.parse(evt.target.result);
+      datenstrukturAbsichern();
+      speichern();
+      alleAnzeigen();
+      alert("Backup eingespielt!");
+    } catch (err) { alert("Fehler beim Importieren."); }
+  };
+  reader.readAsText(datei);
+}
+
+function escapeHtml(text) {
+  return String(text ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+}
+</script>
+
+</body>
+</html>
