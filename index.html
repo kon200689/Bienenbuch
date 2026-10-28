@@ -935,6 +935,21 @@ function importJson(e) {
 function escapeHtml(text) {
   return String(text ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
 }
+
+/* ---------- Passwort-Schutz ---------- */
+function passwortPruefen() {
+  const geheimPW = "bienen2026"; // Hier kannst du dein eigenes Passwort ändern
+  
+  const eingabe = prompt("Bitte gib das Passwort für deine Stockkarte ein:");
+  if (eingabe !== geheimPW) {
+    alert("Falsches Passwort! Zugriff verweigert.");
+    document.body.innerHTML = "<h2 style='text-align:center; margin-top:50px; color:#b3261e;'>🔒 Zugriff verwehrt. Bitte Seite neu laden und Passwort eingeben.</h2>";
+    throw new Error("Zugriff verweigert");
+  }
+}
+
+// Passwort direkt beim Aufrufen der Seite abfragen:
+passwortPruefen();
 </script>
 
 </body>
