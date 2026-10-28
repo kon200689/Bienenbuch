@@ -548,27 +548,22 @@
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
   import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-  // =========================================================================
-  // HIER DEINE FIREBASE ZUGANGSDATEN EINSETZEN (aus Schritt 1.4):
-  // =========================================================================
-const firebaseConfig = {
-  apiKey: "AIzaSy...",
-  authDomain: "bienenbuch.firebaseapp.com",
-  databaseURL: "https://bienenbuch-d71d1-default-rtdb.europe-west1.firebasedatabase.app/",
-  projectId: "bienenbuch",
-  storageBucket: "bienenbuch.appspot.com",
-  messagingSenderId: "123456...",
-  appId: "1:123456..."
-};
+  const firebaseConfig = {
+    apiKey: "AIzaSy...",
+    authDomain: "bienenbuch.firebaseapp.com",
+    databaseURL: "https://bienenbuch-d71d1-default-rtdb.europe-west1.firebasedatabase.app/",
+    projectId: "bienenbuch",
+    storageBucket: "bienenbuch.appspot.com",
+    messagingSenderId: "123456...",
+    appId: "1:123456..."
+  };
 
   const app = initializeApp(firebaseConfig);
   const db = getDatabase(app);
   const datenRef = ref(db, 'stockkarte_daten');
 
-  // Globale Datenstruktur
   window.daten = { voelker: [], standorte: [] };
 
-  // Bei Änderungen in der Cloud automatisch die Anzeige auf der Website aktualisieren
   onValue(datenRef, (snapshot) => {
     const cloudDaten = snapshot.val();
     if (cloudDaten) {
@@ -578,12 +573,17 @@ const firebaseConfig = {
     }
     window.datenstrukturAbsichern();
     window.alleAnzeigen();
-    document.getElementById("syncBadge").textContent = "☁️ Live synchronisiert";
-    document.getElementById("syncBadge").className = "sync-badge ok";
-    document.getElementById("cloudStatusText").textContent = "Erfolgreich mit der Cloud verbunden. Alle Daten sind aktuell.";
+    const badge = document.getElementById("syncBadge");
+    if (badge) {
+      badge.textContent = "☁️ Live synchronisiert";
+      badge.className = "sync-badge ok";
+    }
+    const statusText = document.getElementById("cloudStatusText");
+    if (statusText) {
+      statusText.textContent = "Erfolgreich mit der Cloud verbunden. Alle Daten sind aktuell.";
+    }
   });
 
-  // Funktion zum Speichern in der Cloud
   window.speichern = function() {
     set(datenRef, window.daten).then(() => {
       console.log("Erfolgreich in Cloud gespeichert!");
@@ -594,6 +594,20 @@ const firebaseConfig = {
 </script>
 
 <script>
+/* ---------- Passwort-Schutz direkt am Anfang ---------- */
+function passwortPruefen() {
+  const geheimPW = "bienen2026"; // Hier kannst du dein Passwort anpassen
+  const eingabe = prompt("Bitte gib das Passwort für deine Stockkarte ein:");
+  if (eingabe !== geheimPW) {
+    alert("Falsches Passwort! Zugriff verweigert.");
+    document.body.innerHTML = "<h2 style='text-align:center; margin-top:50px; color:#b3261e;'>🔒 Zugriff verwehrt. Bitte Seite neu laden und Passwort eingeben.</h2>";
+    throw new Error("Zugriff verweigert");
+  }
+}
+
+// Passwort sofort beim Laden der Seite ausführen:
+passwortPruefen();
+
 let aktivesVolk = null;
 let aktuellerReiter = "dashboard";
 
@@ -742,18 +756,24 @@ function aktualisiereVolkAuswahl() {
 }
 
 function gesamtUebersichtAnzeigen() {
-  document.getElementById("gesamtKpi").innerHTML = `
-    <div class="kpi"><small>Völker</small><strong>${daten.voelker.length}</strong></div>
-    <div class="kpi"><small>Standorte</small><strong>${daten.standorte.length}</strong></div>
-  `;
+  const kpi = document.getElementById("gesamtKpi");
+  if (kpi) {
+    kpi.innerHTML = `
+      <div class="kpi"><small>Völker</small><strong>${daten.voelker.length}</strong></div>
+      <div class="kpi"><small>Standorte</small><strong>${daten.standorte.length}</strong></div>
+    `;
+  }
 }
 
 function dashboardAnzeigen() {
   const volk = daten.voelker.find(v => v.id === aktivesVolk);
   if (!volk) return;
-  document.getElementById("kpiBereich").innerHTML = `
-    <div class="kpi"><small>Durchsichten</small><strong>${volk.durchsichten.length}</strong></div>
-  `;
+  const kpi = document.getElementById("kpiBereich");
+  if (kpi) {
+    kpi.innerHTML = `
+      <div class="kpi"><small>Durchsichten</small><strong>${volk.durchsichten.length}</strong></div>
+    `;
+  }
 }
 
 /* ---------- Durchsichten ---------- */
@@ -778,6 +798,7 @@ function durchsichtSpeichern() {
 function durchsichtenAnzeigen() {
   const volk = daten.voelker.find(v => v.id === aktivesVolk);
   const tb = document.getElementById("durchsichten");
+  if (!tb) return;
   if (!volk || !volk.durchsichten.length) return tb.innerHTML = "<tr><td colspan='9'>Keine Durchsichten.</td></tr>";
   tb.innerHTML = volk.durchsichten.map((d, i) => `
     <tr>
@@ -806,7 +827,9 @@ function volkLoeschen() {
 
 /* ---------- Herkunft ---------- */
 function herkunftVolkGewaehlt() {
-  const id = Number(document.getElementById("hVolk").value);
+  const sel = document.getElementById("hVolk");
+  if (!sel || !sel.value) return;
+  const id = Number(sel.value);
   const volk = daten.voelker.find(v => v.id === id);
   if (!volk) return;
   document.getElementById("herkunftBereich").classList.remove("hidden");
@@ -821,7 +844,9 @@ function herkunftVolkGewaehlt() {
 }
 
 function herkunftSpeichern() {
-  const id = Number(document.getElementById("hVolk").value);
+  const sel = document.getElementById("hVolk");
+  if (!sel || !sel.value) return;
+  const id = Number(sel.value);
   const volk = daten.voelker.find(v => v.id === id);
   if (!volk) return;
   volk.herkunft = {
@@ -848,7 +873,13 @@ function herkunftGesamtTabelleAnzeigen() {
 }
 
 /* ---------- Behandlung & Fütterung ---------- */
-function behandlungVolkGewaehlt() { document.getElementById("behandlungBereich").classList.remove("hidden"); behandlungenAnzeigen(); }
+function behandlungVolkGewaehlt() { 
+  const sel = document.getElementById("bVolk");
+  if (sel && sel.value) {
+    document.getElementById("behandlungBereich").classList.remove("hidden"); 
+    behandlungenAnzeigen(); 
+  }
+}
 function behandlungSpeichern() {
   const id = Number(document.getElementById("bVolk").value);
   const volk = daten.voelker.find(v => v.id === id);
@@ -861,9 +892,12 @@ function behandlungSpeichern() {
   speichern(); behandlungenAnzeigen();
 }
 function behandlungenAnzeigen() {
-  const id = Number(document.getElementById("bVolk").value);
+  const sel = document.getElementById("bVolk");
+  if (!sel || !sel.value) return;
+  const id = Number(sel.value);
   const volk = daten.voelker.find(v => v.id === id);
   const tb = document.getElementById("behandlungen");
+  if (!tb) return;
   if (!volk || !volk.behandlungen.length) return tb.innerHTML = "<tr><td colspan='6'>Keine Behandlungen.</td></tr>";
   tb.innerHTML = volk.behandlungen.map((b, i) => `<tr><td>${b.beginn}</td><td>${b.ende||"–"}</td><td>${escapeHtml(b.mittel)}</td><td>${escapeHtml(b.dosierung)}</td><td>${escapeHtml(b.bemerkung)}</td><td><button class="danger" onclick="behandlungLoeschen(${i})">✕</button></td></tr>`).join("");
 }
@@ -873,7 +907,13 @@ function behandlungLoeschen(i) {
   if (volk && confirm("Löschen?")) { volk.behandlungen.splice(i, 1); speichern(); behandlungenAnzeigen(); }
 }
 
-function fuetterungVolkGewaehlt() { document.getElementById("fuetterungBereich").classList.remove("hidden"); fuetterungenAnzeigen(); }
+function fuetterungVolkGewaehlt() { 
+  const sel = document.getElementById("fVolk");
+  if (sel && sel.value) {
+    document.getElementById("fuetterungBereich").classList.remove("hidden"); 
+    fuetterungenAnzeigen(); 
+  }
+}
 function fuetterungSpeichern() {
   const id = Number(document.getElementById("fVolk").value);
   const volk = daten.voelker.find(v => v.id === id);
@@ -885,9 +925,12 @@ function fuetterungSpeichern() {
   speichern(); fuetterungenAnzeigen();
 }
 function fuetterungenAnzeigen() {
-  const id = Number(document.getElementById("fVolk").value);
+  const sel = document.getElementById("fVolk");
+  if (!sel || !sel.value) return;
+  const id = Number(sel.value);
   const volk = daten.voelker.find(v => v.id === id);
   const tb = document.getElementById("fuetterungen");
+  if (!tb) return;
   if (!volk || !volk.fuetterungen.length) return tb.innerHTML = "<tr><td colspan='5'>Keine Fütterungen.</td></tr>";
   tb.innerHTML = volk.fuetterungen.map((f, i) => `<tr><td>${f.datum}</td><td>${f.menge} kg</td><td>${escapeHtml(f.form)}</td><td>${escapeHtml(f.bemerkung)}</td><td><button class="danger" onclick="fuetterungLoeschen(${i})">✕</button></td></tr>`).join("");
 }
@@ -897,7 +940,30 @@ function fuetterungLoeschen(i) {
   if (volk && confirm("Löschen?")) { volk.fuetterungen.splice(i, 1); speichern(); fuetterungenAnzeigen(); }
 }
 
-function vergleichAnzeigen() {}
+function vergleichAnzeigen() {
+  const tb = document.getElementById("vergleichTabelle");
+  if (!tb) return;
+  if (!daten.voelker.length) {
+    tb.innerHTML = `<tr><td colspan="9">Noch keine Völker angelegt.</td></tr>`;
+    return;
+  }
+  tb.innerHTML = daten.voelker.map(volk => {
+    const letzte = volk.durchsichten[0];
+    return `
+      <tr>
+        <td><strong>${escapeHtml(volk.name)}</strong></td>
+        <td>${escapeHtml(volk.standort || "–")}</td>
+        <td>${letzte ? escapeHtml(letzte.datum) : "–"}</td>
+        <td>${letzte && letzte.staerke ? escapeHtml(letzte.staerke) : "–"}</td>
+        <td>${letzte && letzte.futter ? escapeHtml(letzte.futter) : "–"}</td>
+        <td>${letzte && letzte.varroa ? escapeHtml(letzte.varroa) + " / Tag" : "–"}</td>
+        <td>–</td>
+        <td><span class="ampel-badge" style="background:#e8f5e9;color:#2e7d32">Grün</span></td>
+        <td><button onclick="volkOeffnen(${volk.id})">Öffnen</button></td>
+      </tr>
+    `;
+  }).join("");
+}
 
 function alleAnzeigen() {
   listeAnzeigen();
@@ -906,6 +972,7 @@ function alleAnzeigen() {
   aktualisiereVolkAuswahl();
   gesamtUebersichtAnzeigen();
   herkunftGesamtTabelleAnzeigen();
+  vergleichAnzeigen();
 }
 
 function exportJson() {
@@ -935,21 +1002,6 @@ function importJson(e) {
 function escapeHtml(text) {
   return String(text ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
 }
-
-/* ---------- Passwort-Schutz ---------- */
-function passwortPruefen() {
-  const geheimPW = "bienen2026"; // Hier kannst du dein eigenes Passwort ändern
-  
-  const eingabe = prompt("Bitte gib das Passwort für deine Stockkarte ein:");
-  if (eingabe !== geheimPW) {
-    alert("Falsches Passwort! Zugriff verweigert.");
-    document.body.innerHTML = "<h2 style='text-align:center; margin-top:50px; color:#b3261e;'>🔒 Zugriff verwehrt. Bitte Seite neu laden und Passwort eingeben.</h2>";
-    throw new Error("Zugriff verweigert");
-  }
-}
-
-// Passwort direkt beim Aufrufen der Seite abfragen:
-passwortPruefen();
 </script>
 
 </body>
