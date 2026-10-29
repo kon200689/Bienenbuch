@@ -305,11 +305,11 @@
         </div>
         <div>
           <label for="sLat">Breitengrad (GPS)</label>
-          <input type="number" step="0.000001" id="sLat" readonly>
+          <input type="number" step="0.000001" id="sLat" placeholder="Klick auf Karte oder manuell">
         </div>
         <div>
           <label for="sLng">Längengrad (GPS)</label>
-          <input type="number" step="0.000001" id="sLng" readonly>
+          <input type="number" step="0.000001" id="sLng" placeholder="Klick auf Karte oder manuell">
         </div>
       </div>
       <div id="mapAuswahl"></div>
@@ -610,6 +610,7 @@ passwortPruefen();
 
 let aktivesVolk = null;
 let aktuellerReiter = "dashboard";
+let bearbeiteStandortId = null;
 
 function datenstrukturAbsichern() {
   if (!Array.isArray(daten.standorte)) daten.standorte = [];
@@ -639,10 +640,9 @@ function zeigeReiter(name) {
 
 function heute() { return new Date().toISOString().slice(0, 10); }
 
-/* ---------- Standorte (mit Layer-Steuerung) ---------- */
+/* ---------- Standorte (mit Layer-Steuerung & Bearbeitung) ---------- */
 let mapAuswahl = null, markerAuswahl = null, mapUebersicht = null, uebersichtMarkerEbene = null;
 
-// Hilfsfunktion zur Erstellung der Layer-Optionen
 function erstelleKartenLayers() {
   const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
@@ -689,6 +689,7 @@ function initMapAuswahl() {
         else markerAuswahl = L.marker(e.latlng).addTo(mapAuswahl);
       });
     }
+    mapAuswahl.invalidateSize();
   }, 150);
 }
 
@@ -707,6 +708,7 @@ function initMapUebersicht() {
 
       uebersichtMarkerEbene = L.layerGroup().addTo(mapUebersicht);
     }
+    mapUebersicht.invalidateSize();
     aktualisiereUebersichtKarte();
   }, 150);
 }
@@ -714,32 +716,119 @@ function initMapUebersicht() {
 function aktualisiereUebersichtKarte() {
   if (!uebersichtMarkerEbene) return;
   uebersichtMarkerEbene.clearLayers();
+  const bounds = [];
   daten.standorte.forEach(st => {
-    if (st.lat && st.lng) {
-      L.marker([st.lat, st.lng]).bindPopup(`<b>${escapeHtml(st.name)}</b>`).addTo(uebersichtMarkerEbene);
+    if (st.lat !== "" && st.lng !== "" && Number.isFinite(Number(st.lat)) && Number.isFinite(Number(st.lng))) {
+      const latLng = [Number(st.lat), Number(st.lng)];
+      bounds.push(latLng);
+      const anzahlVoelker = daten.voelker.filter(v => v.standort === st.name).length;
+      L.marker(latLng).bindPopup(`<b>${escapeHtml(st.name)}</b><br>${anzahlVoelker} Volk/Völker`).addTo(uebersichtMarkerEbene);
     }
   });
+  if (mapUebersicht && bounds.length > 0) {
+    if (bounds.length === 1) mapUebersicht.setView(bounds[0], 13);
+    else mapUebersicht.fitBounds(bounds, { padding: [30, 30] });
+  }
 }
 
 function standortSpeichern() {
   const name = document.getElementById("sName").value.trim();
+  const lat = document.getElementById("sLat").value;
+  const lng = document.getElementById("sLng").value;
+
   if (!name) return alert("Bitte Standort-Namen eingeben.");
-  daten.standorte.push({ id: Date.now(), name, lat: document.getElementById("sLat").value, lng: document.getElementById("sLng").value });
-  document.getElementById("sName").value = "";
+
+  if (bearbeiteStandortId !== null) {
+    // Bearbeiten eines bestehenden Standorts
+    const alterStandort = daten.standorte.find(s => s.id === bearbeiteStandortId);
+    if (alterStandort) {
+      const alterName = alterStandort.name;
+      alterStandort.name = name;
+      alterStandort.lat = lat;
+      alterStandort.lng = lng;
+
+      // Auch bei zugewiesenen Völkern den Namen aktualisieren, falls er geändert wurde
+      if (alterName !== name) {
+        daten.voelker.forEach(v => {
+          if (v.standort === alterName) v.standort = name;
+        });
+      }
+    }
+  } else {
+    // Neuen Standort anlegen
+    daten.standorte.push({ id: Date.now(), name, lat, lng });
+  }
+
+  standortBearbeitenAbbrechen();
   speichern();
   alleAnzeigen();
+}
+
+function standortBearbeiten(id) {
+  const st = daten.standorte.find(s => s.id === id);
+  if (!st) return;
+
+  bearbeiteStandortId = id;
+  document.getElementById("standortFormTitel").textContent = "✏️ Standort bearbeiten";
+  document.getElementById("sName").value = st.name;
+  document.getElementById("sLat").value = st.lat || "";
+  document.getElementById("sLng").value = st.lng || "";
+
+  document.getElementById("sSpeichernBtn").textContent = "Standort aktualisieren";
+  document.getElementById("sAbbrechenBtn").classList.remove("hidden");
+
+  // Auf Karte zentrieren & Marker setzen
+  if (mapAuswahl && st.lat && st.lng) {
+    const pos = [Number(st.lat), Number(st.lng)];
+    mapAuswahl.setView(pos, 13);
+    if (markerAuswahl) markerAuswahl.setLatLng(pos);
+    else markerAuswahl = L.marker(pos).addTo(mapAuswahl);
+  }
+
+  // Sanftes Scrollen zum Formular
+  document.getElementById("standortFormTitel").scrollIntoView({ behavior: 'smooth' });
+}
+
+function standortBearbeitenAbbrechen() {
+  bearbeiteStandortId = null;
+  document.getElementById("standortFormTitel").textContent = "➕ Bienenstand anlegen";
+  document.getElementById("sName").value = "";
+  document.getElementById("sLat").value = "";
+  document.getElementById("sLng").value = "";
+
+  document.getElementById("sSpeichernBtn").textContent = "Standort speichern";
+  document.getElementById("sAbbrechenBtn").classList.add("hidden");
+
+  if (markerAuswahl && mapAuswahl) {
+    mapAuswahl.removeLayer(markerAuswahl);
+    markerAuswahl = null;
+  }
 }
 
 function standorteAnzeigen() {
   const l = document.getElementById("standortListe");
   if (!daten.standorte.length) return l.innerHTML = "<p>Noch keine Standorte.</p>";
-  l.innerHTML = "<table>" + daten.standorte.map(s => `<tr><td><b>${escapeHtml(s.name)}</b></td><td><button class="danger" onclick="standortLoeschen(${s.id})">✕</button></td></tr>`).join("") + "</table>";
+  l.innerHTML = "<table>" + daten.standorte.map(s => `
+    <tr>
+      <td><b>${escapeHtml(s.name)}</b> ${s.lat && s.lng ? `<span class="small">(${s.lat}, ${s.lng})</span>` : ''}</td>
+      <td style="width:110px; text-align:right;">
+        <button class="secondary" onclick="standortBearbeiten(${s.id})">✏️</button>
+        <button class="danger" onclick="standortLoeschen(${s.id})">✕</button>
+      </td>
+    </tr>
+  `).join("") + "</table>";
 }
 
 function standortLoeschen(id) {
-  daten.standorte = daten.standorte.filter(s => s.id !== id);
-  speichern();
-  alleAnzeigen();
+  const st = daten.standorte.find(s => s.id === id);
+  if (!st) return;
+
+  if (confirm(`Soll der Standort "${st.name}" wirklich gelöscht werden?`)) {
+    daten.standorte = daten.standorte.filter(s => s.id !== id);
+    if (bearbeiteStandortId === id) standortBearbeitenAbbrechen();
+    speichern();
+    alleAnzeigen();
+  }
 }
 
 function aktualisiereStandortAuswahl() {
@@ -1016,6 +1105,7 @@ function alleAnzeigen() {
   gesamtUebersichtAnzeigen();
   herkunftGesamtTabelleAnzeigen();
   vergleichAnzeigen();
+  if (mapUebersicht) aktualisiereUebersichtKarte();
 }
 
 function exportJson() {
@@ -1049,3 +1139,9 @@ function escapeHtml(text) {
 
 </body>
 </html>
+```
+
+### Neue Funktionen auf einen Blick:
+1. **Standort bearbeiten (✏️-Button):** Klicke in der Liste "Meine Bienenstände" auf das Stift-Symbol, um den Standort zu laden.
+2. **Karten-Anpassung:** Beim Bearbeiten springt die Karte automatisch zu den aktuellen GPS-Koordinaten des Standorts. Du kannst durch erneutes Klicken auf die Karte neue Koordinaten festlegen oder diese per Hand eingeben.
+3. **Automatische Verknüpfung:** Wenn du den Namen eines Standorts änderst, werden auch alle zugeordneten Völker automatisch auf den neuen Standortnamen aktualisiert.
