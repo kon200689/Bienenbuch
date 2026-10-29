@@ -1690,13 +1690,16 @@ function ernteAnzeigen() {
 
   const totalKg = list.reduce((n, e) => n + (Number(e.menge) || 0), 0);
   const totalGlaeser = totalKg / 0.5;
+  
+  // Alle Ernten desselben Tages zählen als eine gemeinsame Schleuderung
+  const anzahlSchleuderungen = new Set(list.map(e => e.datum)).size;
 
   const sums = document.getElementById('ernteSummen');
   if (sums) {
     sums.innerHTML = `
       <div class="kpi"><small>Gesamtertrag Honig</small><strong>${totalKg.toFixed(1)} kg</strong></div>
       <div class="kpi"><small>Ertrag in Gläsern (500g)</small><strong>${totalGlaeser.toFixed(0)} Gläser</strong></div>
-      <div class="kpi"><small>Erfasste Ernten</small><strong>${list.length} Schleuderungen</strong></div>
+      <div class="kpi"><small>Schleuderungen (Tage)</small><strong>${anzahlSchleuderungen} Schleuderung${anzahlSchleuderungen === 1 ? '' : 'en'}</strong></div>
     `;
   }
 }
