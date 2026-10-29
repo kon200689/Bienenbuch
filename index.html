@@ -226,6 +226,19 @@
   dialog { max-width: 780px; width: calc(100% - 32px); border: 0; border-radius: 14px; padding: 0; }
   .dialog-inhalt { padding: 22px; }
   
+  .toolbar { display:flex; flex-wrap:wrap; gap:10px; align-items:end; margin-bottom:14px; }
+  .toolbar > div { flex:1; min-width:180px; }
+  .status-pill { display:inline-block; padding:3px 8px; border-radius:999px; font-size:12px; background:#edf5e9; color:#285b2b; }
+  .task-item { border:1px solid var(--kartenrand); border-radius:9px; padding:12px; margin:8px 0; display:flex; justify-content:space-between; gap:12px; align-items:start; }
+  .task-item.overdue { border-left:5px solid var(--rot); background:#fff5f4; }
+  .task-item.done { opacity:.65; }
+  .event-list { border-left:3px solid var(--gelb); margin:8px 0 8px 8px; padding-left:16px; }
+  .event-item { position:relative; padding:0 0 14px; }
+  .event-item:before { content:""; position:absolute; left:-22px; top:7px; width:9px; height:9px; border-radius:50%; background:var(--honig); }
+  .thumbs { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+  .thumbs a { display:block; max-width:150px; overflow-wrap:anywhere; }
+  .thumbs img { width:130px; height:90px; object-fit:cover; border-radius:8px; border:1px solid var(--kartenrand); }
+  @media print { .no-print, button, nav, .actions { display:none !important; } body { background:#fff; } .card { box-shadow:none; break-inside:avoid; } }
   footer { max-width: 1200px; margin: 30px auto; padding: 0 18px; font-size: 11px; }
 </style>
 </head>
@@ -234,7 +247,7 @@
 <header class="hero">
   <div class="hero-inhalt">
     <span class="hero-badge" style="margin-top:0;margin-bottom:14px">🐝 Imkerei digital</span>
-    <h1>Digitales Bienenbuch</h1>
+    <h1>Digitale Stockkarte & Dashboard</h1>
     <p>Verwalte deine Bienenvölker, Durchsichten und Königinnen – synchronisiert in Echtzeit zwischen PC und Smartphone.</p>
     <span class="hero-badge">☁️ Live Cloud-Synchronisation aktiv</span>
     <div id="syncBadge" class="sync-badge ok">☁️ Cloud verbunden</div>
@@ -249,6 +262,7 @@
     <button type="button" data-reiter="herkunft" onclick="zeigeReiter('herkunft')">👑 Herkunft & Abstammung</button>
     <button type="button" data-reiter="behandlung" onclick="zeigeReiter('behandlung')">🧪 Varroa & Behandlung</button>
     <button type="button" data-reiter="fuetterung" onclick="zeigeReiter('fuetterung')">🍯 Fütterung</button>
+    <button type="button" data-reiter="management" onclick="zeigeReiter('management')">🗓️ Aufgaben & Verlauf</button>
     <button type="button" data-reiter="sync" onclick="zeigeReiter('sync')">⚙️ Sync & Cloud</button>
   </div>
 </nav>
@@ -404,6 +418,7 @@
           <div><label for="dVarroa">Varroa: Milben/Tag</label><input type="number" step="0.1" id="dVarroa"></div>
         </div>
         <div style="margin-top:12px"><label for="dBemerkung">Bemerkungen</label><textarea id="dBemerkung"></textarea></div>
+        <div style="margin-top:12px"><label for="dFotos">Foto-Links (optional, eine URL pro Zeile)</label><textarea id="dFotos" placeholder="https://…"></textarea><p class="small">Die Bilder bleiben über ihre URL verknüpft. Bitte keine privaten oder nicht freigegebenen Links verwenden.</p></div>
         <div class="actions">
           <button class="green" id="durchsichtSpeichernBtn" onclick="durchsichtSpeichern()">Durchsicht speichern</button>
           <button class="secondary hidden" id="durchsichtAbbrechenBtn" onclick="durchsichtFormZuruecksetzen()">Bearbeiten abbrechen</button>
@@ -529,6 +544,74 @@
     </section>
   </section>
 
+  <!-- ================= Reiter: Aufgaben, Verlauf & Wirtschaftlichkeit ================= -->
+  <section id="reiter-management" class="reiter hidden">
+    <section class="card">
+      <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap"><h2>🗓️ Aufgaben & anstehende Kontrollen</h2><button class="secondary" onclick="managementAnzeigen()">↻ Aktualisieren</button></div>
+      <p class="small">Automatische Hinweise sind Planungshilfen und ersetzen keine fachliche Beurteilung des Volkes.</p>
+      <div id="autoHinweise"></div>
+      <h3>Eigene Aufgabe / Erinnerung</h3>
+      <div class="grid">
+        <div><label for="aVolk">Volk</label><select id="aVolk"></select></div>
+        <div><label for="aFaellig">Fällig am</label><input type="date" id="aFaellig"></div>
+        <div><label for="aTitel">Aufgabe</label><input id="aTitel" placeholder="z. B. Futtervorrat kontrollieren"></div>
+        <div><label for="aPrioritaet">Priorität</label><select id="aPrioritaet"><option>Normal</option><option>Hoch</option><option>Niedrig</option></select></div>
+      </div>
+      <div class="actions"><button class="green" onclick="aufgabeSpeichern()">Aufgabe hinzufügen</button></div>
+      <div id="aufgabenListe"></div>
+    </section>
+
+    <section class="card">
+      <h2>📈 Gewichtskontrolle</h2>
+      <div class="grid">
+        <div><label for="gVolk">Volk</label><select id="gVolk" onchange="zeichneGewichtsDiagramm()"></select></div>
+        <div><label for="gDatum">Datum</label><input type="date" id="gDatum"></div>
+        <div><label for="gGewicht">Gesamtgewicht (kg)</label><input type="number" step="0.1" min="0" id="gGewicht"></div>
+        <div><label for="gBemerkung">Bemerkung</label><input id="gBemerkung" placeholder="z. B. nach Fütterung"></div>
+      </div>
+      <div class="actions"><button class="green" onclick="gewichtSpeichern()">Gewicht speichern</button></div>
+      <h3>Gewichtsverlauf des ausgewählten Volkes</h3><div class="chart-box"><canvas id="gewichtChart"></canvas></div>
+      <div style="overflow-x:auto"><table><thead><tr><th>Datum</th><th>Volk</th><th>Gewicht</th><th>Bemerkung</th><th></th></tr></thead><tbody id="gewichtsTabelle"></tbody></table></div>
+    </section>
+
+    <section class="card">
+      <h2>🍯 Honigernte, Chargen & Kosten</h2>
+      <div class="grid">
+        <div><label for="eVolk">Volk / Stand</label><select id="eVolk"></select></div>
+        <div><label for="eDatum">Erntedatum</label><input type="date" id="eDatum"></div>
+        <div><label for="eSorte">Honigsorte / Charge</label><input id="eSorte" placeholder="z. B. Frühtracht 2026"></div>
+        <div><label for="eMenge">Erntemenge (kg)</label><input type="number" min="0" step="0.1" id="eMenge"></div>
+        <div><label for="eKosten">Kosten (€)</label><input type="number" min="0" step="0.01" id="eKosten"></div>
+        <div><label for="eBemerkung">Bemerkung</label><input id="eBemerkung"></div>
+      </div>
+      <div class="actions"><button class="green" onclick="ernteSpeichern()">Ernte / Kosten speichern</button></div>
+      <div id="ernteSummen" class="kpi-grid"></div>
+      <div style="overflow-x:auto"><table><thead><tr><th>Datum</th><th>Volk</th><th>Sorte / Charge</th><th>Menge (kg)</th><th>Kosten (€)</th><th>Bemerkung</th><th></th></tr></thead><tbody id="ernteTabelle"></tbody></table></div>
+    </section>
+
+    <section class="card">
+      <h2>👑 Königinnenhistorie</h2>
+      <div class="grid">
+        <div><label for="qVolk">Volk</label><select id="qVolk"></select></div>
+        <div><label for="qDatum">Datum</label><input type="date" id="qDatum"></div>
+        <div><label for="qEreignis">Ereignis</label><select id="qEreignis"><option>Neue Königin eingesetzt</option><option>Königin gesehen</option><option>Umweiselung</option><option>Nachschaffungszellen</option><option>Weisellosigkeit festgestellt</option><option>Begattung / Belegstelle</option></select></div>
+        <div><label for="qInfo">Kennzeichnung / Herkunft</label><input id="qInfo" placeholder="z. B. Grün 2026, Linie …"></div>
+      </div>
+      <div style="margin-top:10px"><label for="qBemerkung">Notizen</label><textarea id="qBemerkung"></textarea></div>
+      <div class="actions"><button class="green" onclick="koeniginEreignisSpeichern()">Ereignis speichern</button></div>
+      <div style="overflow-x:auto"><table><thead><tr><th>Datum</th><th>Volk</th><th>Ereignis</th><th>Kennzeichnung / Herkunft</th><th>Notizen</th><th></th></tr></thead><tbody id="koeniginTabelle"></tbody></table></div>
+    </section>
+
+    <section class="card">
+      <h2>🧾 Jahresverlauf & Datenexport</h2>
+      <p>Der Verlauf fasst Durchsichten, Behandlungen, Fütterungen, Gewichtsmessungen, Königinnenereignisse und Ernten chronologisch zusammen.</p>
+      <div class="toolbar"><div><label for="timelineVolk">Volk für Zeitleiste</label><select id="timelineVolk" onchange="zeitleisteAnzeigen()"><option value="">Alle Völker</option></select></div><div><label for="timelineJahr">Jahr</label><select id="timelineJahr" onchange="zeitleisteAnzeigen()"><option value="">Alle Jahre</option></select></div></div>
+      <div id="zeitleiste" class="event-list"></div>
+      <div class="actions no-print"><button class="secondary" onclick="exportCsv()">CSV-Übersicht herunterladen</button><button class="secondary" onclick="window.print()">Drucken / als PDF speichern</button><button class="secondary" onclick="exportJson()">Vollständiges JSON-Backup</button></div>
+      <p class="small">Für PDF im Druckdialog „Als PDF speichern“ auswählen. Fotos werden als verknüpfte URLs angezeigt; die CSV enthält strukturierte Kerndaten.</p>
+    </section>
+  </section>
+
   <!-- ================= Reiter: Sync & Cloud ================= -->
   <section id="reiter-sync" class="reiter hidden">
     <section class="card">
@@ -628,10 +711,16 @@ let bearbeiteDurchsichtIndex = null;
 function datenstrukturAbsichern() {
   if (!Array.isArray(daten.standorte)) daten.standorte = [];
   if (!Array.isArray(daten.voelker)) daten.voelker = [];
+  if (!Array.isArray(daten.aufgaben)) daten.aufgaben = [];
+  if (!Array.isArray(daten.gewichte)) daten.gewichte = [];
+  if (!Array.isArray(daten.ernten)) daten.ernten = [];
+  if (!Array.isArray(daten.koeniginnenEreignisse)) daten.koeniginnenEreignisse = [];
   daten.voelker.forEach(volk => {
     if (!Array.isArray(volk.durchsichten)) volk.durchsichten = [];
     if (!Array.isArray(volk.behandlungen)) volk.behandlungen = [];
     if (!Array.isArray(volk.fuetterungen)) volk.fuetterungen = [];
+    if (!Array.isArray(volk.gewichte)) volk.gewichte = [];
+    if (!Array.isArray(volk.ernten)) volk.ernten = [];
     if (!volk.herkunft) volk.herkunft = {};
   });
 }
@@ -649,9 +738,10 @@ function zeigeReiter(name) {
   if (name === "dashboard") { vergleichAnzeigen(); gesamtUebersichtAnzeigen(); }
   else if (name === "standorte") { standorteAnzeigen(); initMapAuswahl(); initMapUebersicht(); }
   else if (name === "herkunft") { aktualisiereVolkAuswahl(); herkunftGesamtTabelleAnzeigen(); }
+  else if (name === "management") { managementAuswahlAktualisieren(); managementAnzeigen(); }
 }
 
-function heute() { return new Date().toISOString().slice(0, 10); }
+function heute() { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 function datumAnzeigen(datum) {
   if (!datum) return "–";
   const teile = String(datum).slice(0, 10).split("-");
@@ -756,8 +846,19 @@ function volkSpeichern() {
 
 function listeAnzeigen() {
   const l = document.getElementById("volkListe");
+  if (!l) return;
   if (!daten.voelker.length) return l.innerHTML = "<p>Noch keine Völker.</p>";
-  l.innerHTML = daten.voelker.map(v => `
+  const suchfeld = document.getElementById('volkSuche');
+  const filterfeld = document.getElementById('volkFilterStandort');
+  const q = (suchfeld?.value || '').trim().toLocaleLowerCase('de');
+  const standort = filterfeld?.value || '';
+  const gefiltert = daten.voelker.filter(v => {
+    const h = v.herkunft || {};
+    const text = [v.name, v.standort, v.beute, v.koenigin, h.rasse, h.muttervolk].join(' ').toLocaleLowerCase('de');
+    return (!q || text.includes(q)) && (!standort || v.standort === standort);
+  });
+  if (!gefiltert.length) return l.innerHTML = '<p>Keine passenden Völker gefunden.</p>';
+  l.innerHTML = gefiltert.map(v => `
     <div class="volk-card-item">
       <button class="volk-btn ${aktivesVolk === v.id ? 'active' : ''}" onclick="volkOeffnen(${v.id})">
         <strong>${escapeHtml(v.name)}</strong>
@@ -796,8 +897,12 @@ function gesamtUebersichtAnzeigen() {
     kpi.innerHTML = `
       <div class="kpi"><small>Völker</small><strong>${daten.voelker.length}</strong></div>
       <div class="kpi"><small>Standorte</small><strong>${daten.standorte.length}</strong></div>
+      <div class="kpi"><small>Offene Aufgaben</small><strong>${(daten.aufgaben||[]).filter(a=>!a.erledigt).length}</strong></div>
+      <div class="kpi"><small>Erfasste Ernten</small><strong>${(daten.ernten||[]).reduce((n,e)=>n+(Number(e.menge)||0),0).toFixed(1)} kg</strong></div>
     `;
   }
+  const hints=document.getElementById('gesamtHinweise');
+  if(hints){const offen=(daten.aufgaben||[]).filter(a=>!a.erledigt);hints.innerHTML=offen.length?`<div class="hinweis"><strong>${offen.length} offene Aufgabe(n)</strong> · <button class="secondary" onclick="zeigeReiter('management')">Aufgaben öffnen</button></div>`:'';}
 }
 
 
@@ -1198,7 +1303,7 @@ function durchsichtFormZuruecksetzen() {
   if (button) button.textContent = 'Durchsicht speichern';
   const abbrechen = document.getElementById('durchsichtAbbrechenBtn');
   if (abbrechen) abbrechen.classList.add('hidden');
-  ['dWetter','dVarroa','dBemerkung'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  ['dWetter','dVarroa','dBemerkung','dFotos'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
   ['dStaerke','dBrut','dKoenigin','dFutter'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
   const datum = document.getElementById('dDatum'); if (datum) datum.value = heute();
 }
@@ -1214,7 +1319,8 @@ function durchsichtSpeichern() {
     koenigin: document.getElementById('dKoenigin').value,
     futter: document.getElementById('dFutter').value,
     varroa: document.getElementById('dVarroa').value,
-    bemerkung: document.getElementById('dBemerkung').value
+    bemerkung: document.getElementById('dBemerkung').value,
+    fotos: (document.getElementById('dFotos').value || '').split('\n').map(x => x.trim()).filter(Boolean)
   };
   if (bearbeiteDurchsichtIndex !== null) volk.durchsichten[bearbeiteDurchsichtIndex] = eintrag;
   else volk.durchsichten.push(eintrag);
@@ -1235,6 +1341,7 @@ function durchsichtBearbeiten(index) {
   document.getElementById('dFutter').value = d.futter || '';
   document.getElementById('dVarroa').value = d.varroa ?? '';
   document.getElementById('dBemerkung').value = d.bemerkung || '';
+  document.getElementById('dFotos').value = Array.isArray(d.fotos) ? d.fotos.join('\n') : '';
   document.getElementById('durchsichtSpeichernBtn').textContent = 'Änderungen speichern';
   document.getElementById('durchsichtAbbrechenBtn').classList.remove('hidden');
   document.getElementById('dDatum').scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -1252,7 +1359,7 @@ function durchsichtenAnzeigen() {
       <td>${escapeHtml(d.staerke)}</td><td>${escapeHtml(d.brut)}</td><td>${escapeHtml(d.koenigin)}</td><td>${escapeHtml(d.futter)}</td>
       <td>${d.varroa !== '' && d.varroa != null ? escapeHtml(d.varroa) : '–'}</td>
       <td><span class="ampel-badge" style="background:${ampel.hintergrund};color:${ampel.farbe}">${escapeHtml(ampel.stufe)}</span></td>
-      <td>${escapeHtml(d.bemerkung)}</td>
+      <td>${escapeHtml(d.bemerkung)}${Array.isArray(d.fotos) && d.fotos.length ? `<div class="thumbs">${d.fotos.map(url => /^https?:\/\//i.test(url) ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener">📷 Foto öffnen</a>` : '').join('')}</div>` : ''}</td>
       <td><button type="button" onclick="durchsichtBearbeiten(${index})">✎ Bearbeiten</button></td>
       <td><button class="danger" onclick="durchsichtLoeschen(${index})">✕</button></td>
     </tr>`;
@@ -1413,6 +1520,110 @@ function fuetterungLoeschen(i) {
   if (volk && confirm("Löschen?")) { volk.fuetterungen.splice(i, 1); speichern(); fuetterungenAnzeigen(); }
 }
 
+
+/* ---------- Aufgaben, Gewicht, Ernte, Königinnenhistorie & Zeitleiste ---------- */
+function managementAuswahlAktualisieren() {
+  const options = daten.voelker.map(v => `<option value="${v.id}">${escapeHtml(v.name)}${v.standort ? ' – '+escapeHtml(v.standort) : ''}</option>`).join('');
+  ['aVolk','gVolk','eVolk','qVolk'].forEach(id => { const el=document.getElementById(id); if(el) el.innerHTML = '<option value="">– Volk wählen –</option>'+options; });
+  const tv = document.getElementById('timelineVolk');
+  if (tv) { const val=tv.value; tv.innerHTML='<option value="">Alle Völker</option>'+options; if ([...tv.options].some(o=>o.value===val)) tv.value=val; }
+  const sf=document.getElementById('volkFilterStandort');
+  if (sf) { const val=sf.value; sf.innerHTML='<option value="">Alle Standorte</option>'+daten.standorte.map(s=>`<option value="${escapeHtml(s.name)}">${escapeHtml(s.name)}</option>`).join(''); if ([...sf.options].some(o=>o.value===val)) sf.value=val; }
+  const year=document.getElementById('timelineJahr');
+  if (year) {
+    const years=new Set();
+    daten.voelker.forEach(v=>['durchsichten','behandlungen','fuetterungen','gewichte','ernten'].forEach(k=>(v[k]||[]).forEach(x=>{const d=x.datum||x.beginn||x.ende;if(d)years.add(String(d).slice(0,4));})));
+    (daten.koeniginnenEreignisse||[]).forEach(x=>{if(x.datum)years.add(String(x.datum).slice(0,4));});
+    const val=year.value; year.innerHTML='<option value="">Alle Jahre</option>'+[...years].sort().reverse().map(y=>`<option>${y}</option>`).join(''); if ([...year.options].some(o=>o.value===val)) year.value=val;
+  }
+}
+function aufgabeSpeichern() {
+  const titel=document.getElementById('aTitel').value.trim();
+  if(!titel) return alert('Bitte eine Aufgabe eingeben.');
+  daten.aufgaben.push({id:Date.now(),volkId:document.getElementById('aVolk').value||'',faellig:document.getElementById('aFaellig').value||heute(),titel,prioritaet:document.getElementById('aPrioritaet').value||'Normal',erledigt:false,erstellt:heute()});
+  document.getElementById('aTitel').value=''; speichern(); managementAnzeigen();
+}
+function aufgabeUmschalten(id) { const a=daten.aufgaben.find(x=>String(x.id)===String(id)); if(a){a.erledigt=!a.erledigt;speichern();managementAnzeigen();} }
+function aufgabeLoeschen(id) { if(confirm('Aufgabe löschen?')){daten.aufgaben=daten.aufgaben.filter(x=>String(x.id)!==String(id));speichern();managementAnzeigen();} }
+function gewichtSpeichern(){
+  const volk=daten.voelker.find(v=>String(v.id)===String(document.getElementById('gVolk').value));
+  const gewicht=document.getElementById('gGewicht').value;
+  if(!volk) return alert('Bitte ein Volk auswählen.'); if(gewicht===''||!Number.isFinite(Number(gewicht))||Number(gewicht)<0)return alert('Bitte ein gültiges Gewicht eingeben.');
+  if(!Array.isArray(volk.gewichte))volk.gewichte=[];
+  volk.gewichte.push({id:Date.now(),datum:document.getElementById('gDatum').value||heute(),gewicht:Number(gewicht),bemerkung:document.getElementById('gBemerkung').value});
+  document.getElementById('gGewicht').value='';document.getElementById('gBemerkung').value='';speichern();managementAnzeigen();
+}
+function ernteSpeichern(){
+  const volkId=document.getElementById('eVolk').value; if(!volkId)return alert('Bitte ein Volk auswählen.');
+  const menge=document.getElementById('eMenge').value, kosten=document.getElementById('eKosten').value;
+  if(menge!==''&&Number(menge)<0||kosten!==''&&Number(kosten)<0)return alert('Menge und Kosten dürfen nicht negativ sein.');
+  daten.ernten.push({id:Date.now(),volkId,datum:document.getElementById('eDatum').value||heute(),sorte:document.getElementById('eSorte').value,menge:menge===''?'':Number(menge),kosten:kosten===''?'':Number(kosten),bemerkung:document.getElementById('eBemerkung').value});
+  ['eSorte','eMenge','eKosten','eBemerkung'].forEach(id=>document.getElementById(id).value='');speichern();managementAnzeigen();
+}
+function koeniginEreignisSpeichern(){
+  const volkId=document.getElementById('qVolk').value;if(!volkId)return alert('Bitte ein Volk auswählen.');
+  daten.koeniginnenEreignisse.push({id:Date.now(),volkId,datum:document.getElementById('qDatum').value||heute(),ereignis:document.getElementById('qEreignis').value,info:document.getElementById('qInfo').value,bemerkung:document.getElementById('qBemerkung').value});
+  document.getElementById('qInfo').value='';document.getElementById('qBemerkung').value='';speichern();managementAnzeigen();
+}
+function managementAnzeigen(){
+  datenstrukturAbsichern();
+  const today=heute();
+  const hints=[];
+  daten.voelker.forEach(v=>{
+    const ds=[...(v.durchsichten||[])].sort((a,b)=>String(b.datum||'').localeCompare(String(a.datum||'')));
+    if(!ds.length) hints.push({date:'',volk:v.name,text:'Erste Durchsicht dokumentieren',type:'info'});
+    else if(ds[0].datum && Math.floor((new Date(today+'T00:00:00')-new Date(ds[0].datum+'T00:00:00'))/86400000)>=21) hints.push({date:ds[0].datum,volk:v.name,text:'Durchsicht prüfen: letzte Dokumentation liegt mindestens 21 Tage zurück',type:'warn'});
+    const letzteBehandlung=[...(v.behandlungen||[])].sort((a,b)=>String(b.ende||b.beginn||'').localeCompare(String(a.ende||a.beginn||'')))[0];
+    if(letzteBehandlung && letzteBehandlung.ende){const tage=Math.floor((new Date(today+'T00:00:00')-new Date(letzteBehandlung.ende+'T00:00:00'))/86400000);if(tage>=0&&tage<=14)hints.push({date:letzteBehandlung.ende,volk:v.name,text:'Nachkontrolle nach Behandlung einplanen (Behandlungsende vor '+tage+' Tagen)',type:'warn'});}
+    if(ds[0]?.futter==='Sehr wenig') hints.push({date:ds[0].datum,volk:v.name,text:'Futtervorrat wurde zuletzt als „Sehr wenig“ dokumentiert',type:'warn'});
+    if(ds[0]?.koenigin==='Verdacht weisellos') hints.push({date:ds[0].datum,volk:v.name,text:'Verdacht auf Weisellosigkeit nachkontrollieren',type:'warn'});
+  });
+  const hi=document.getElementById('autoHinweise'); if(hi) hi.innerHTML=hints.length?hints.map(h=>`<div class="${h.type==='warn'?'warnung':'hinweis'}"><strong>${escapeHtml(h.volk)}</strong> · ${h.date?datumAnzeigen(h.date)+' · ':''}${escapeHtml(h.text)}</div>`).join(''):'<p class="hinweis">Aktuell keine automatischen Hinweise aus den erfassten Daten.</p>';
+  const tasks=document.getElementById('aufgabenListe'); if(tasks){const arr=[...(daten.aufgaben||[])].sort((a,b)=>String(a.faellig||'').localeCompare(String(b.faellig||'')));tasks.innerHTML=arr.length?arr.map(a=>{const v=daten.voelker.find(x=>String(x.id)===String(a.volkId));return `<div class="task-item ${a.erledigt?'done':''} ${!a.erledigt&&a.faellig<today?'overdue':''}"><div><strong>${escapeHtml(a.titel)}</strong><div class="small">${escapeHtml(v?.name||'Allgemein')} · Fällig: ${datumAnzeigen(a.faellig)} · Priorität: ${escapeHtml(a.prioritaet||'Normal')}</div></div><div class="actions" style="margin:0"><button class="secondary" onclick="aufgabeUmschalten(${a.id})">${a.erledigt?'Wieder öffnen':'Erledigt'}</button><button class="danger" onclick="aufgabeLoeschen(${a.id})">Löschen</button></div></div>`}).join(''):'<p>Noch keine eigenen Aufgaben angelegt.</p>';}
+  const weights=[]; daten.voelker.forEach(v=>(v.gewichte||[]).forEach(g=>weights.push({...g,volkName:v.name,volkId:v.id}))); weights.sort((a,b)=>String(b.datum).localeCompare(String(a.datum)));
+  zeichneGewichtsDiagramm();
+  const wt=document.getElementById('gewichtsTabelle'); if(wt)wt.innerHTML=weights.length?weights.map(g=>`<tr><td>${datumAnzeigen(g.datum)}</td><td>${escapeHtml(g.volkName)}</td><td>${escapeHtml(g.gewicht)} kg</td><td>${escapeHtml(g.bemerkung||'–')}</td><td><button class="danger" onclick="gewichtLoeschen(${g.volkId},${g.id})">✕</button></td></tr>`).join(''):'<tr><td colspan="5">Noch keine Gewichtsmessungen.</td></tr>';
+  const harvest=[...(daten.ernten||[])].sort((a,b)=>String(b.datum).localeCompare(String(a.datum))); const et=document.getElementById('ernteTabelle');
+  if(et)et.innerHTML=harvest.length?harvest.map(e=>{const v=daten.voelker.find(x=>String(x.id)===String(e.volkId));return `<tr><td>${datumAnzeigen(e.datum)}</td><td>${escapeHtml(v?.name||'–')}</td><td>${escapeHtml(e.sorte||'–')}</td><td>${e.menge!==''&&e.menge!=null?escapeHtml(e.menge):'–'}</td><td>${e.kosten!==''&&e.kosten!=null?Number(e.kosten).toFixed(2):'–'}</td><td>${escapeHtml(e.bemerkung||'–')}</td><td><button class="danger" onclick="ernteLoeschen(${e.id})">✕</button></td></tr>`}).join(''):'<tr><td colspan="7">Noch keine Ernten eingetragen.</td></tr>';
+  const totalKg=harvest.reduce((n,e)=>n+(Number(e.menge)||0),0), totalKosten=harvest.reduce((n,e)=>n+(Number(e.kosten)||0),0); const sums=document.getElementById('ernteSummen'); if(sums)sums.innerHTML=`<div class="kpi"><small>Erntemenge gesamt</small><strong>${totalKg.toFixed(1)} kg</strong></div><div class="kpi"><small>Erfasste Kosten</small><strong>${totalKosten.toFixed(2)} €</strong></div>`;
+  const qe=[...(daten.koeniginnenEreignisse||[])].sort((a,b)=>String(b.datum).localeCompare(String(a.datum))); const qt=document.getElementById('koeniginTabelle'); if(qt)qt.innerHTML=qe.length?qe.map(q=>{const v=daten.voelker.find(x=>String(x.id)===String(q.volkId));return `<tr><td>${datumAnzeigen(q.datum)}</td><td>${escapeHtml(v?.name||'–')}</td><td>${escapeHtml(q.ereignis)}</td><td>${escapeHtml(q.info||'–')}</td><td>${escapeHtml(q.bemerkung||'–')}</td><td><button class="danger" onclick="koeniginEreignisLoeschen(${q.id})">✕</button></td></tr>`}).join(''):'<tr><td colspan="6">Noch keine Königinnenereignisse.</td></tr>';
+  zeitleisteAnzeigen();
+}
+function zeichneGewichtsDiagramm(){
+  const canvas=document.getElementById('gewichtChart'); if(!canvas)return;
+  const id=document.getElementById('gVolk')?.value; const volk=daten.voelker.find(v=>String(v.id)===String(id));
+  const rect=canvas.getBoundingClientRect(); const w=Math.max(300,rect.width||600),h=Math.max(180,rect.height||320),dpr=window.devicePixelRatio||1;
+  canvas.width=w*dpr;canvas.height=h*dpr;const ctx=canvas.getContext('2d');ctx.scale(dpr,dpr);ctx.clearRect(0,0,w,h);
+  const pts=(volk?.gewichte||[]).filter(x=>Number.isFinite(Number(x.gewicht))&&x.datum).sort((a,b)=>String(a.datum).localeCompare(String(b.datum)));
+  if(!pts.length){ctx.fillStyle='#7a7057';ctx.font='14px system-ui';ctx.textAlign='center';ctx.fillText('Noch keine Gewichtsmessungen für dieses Volk.',w/2,h/2);return;}
+  const pad={l:42,r:18,t:18,b:38},pw=w-pad.l-pad.r,ph=h-pad.t-pad.b;const vals=pts.map(x=>Number(x.gewicht));let min=Math.min(...vals),max=Math.max(...vals);if(min===max){min=Math.max(0,min-1);max=max+1;}else{min=Math.max(0,min-(max-min)*.12);max=max+(max-min)*.12;}
+  ctx.strokeStyle='#ded6c4';ctx.fillStyle='#766b55';ctx.font='11px system-ui';ctx.lineWidth=1;
+  for(let i=0;i<=4;i++){const y=pad.t+ph*i/4;ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(w-pad.r,y);ctx.stroke();ctx.textAlign='right';ctx.fillText((max-(max-min)*i/4).toFixed(1),pad.l-7,y+4);}
+  const x=i=>pad.l+(pts.length===1?pw/2:i*pw/(pts.length-1));const y=v=>pad.t+(max-v)*ph/(max-min);
+  ctx.strokeStyle='#c58a13';ctx.lineWidth=2.5;ctx.beginPath();pts.forEach((p,i)=>i?ctx.lineTo(x(i),y(Number(p.gewicht))):ctx.moveTo(x(i),y(Number(p.gewicht))));ctx.stroke();
+  pts.forEach((p,i)=>{ctx.fillStyle='#2d2a23';ctx.beginPath();ctx.arc(x(i),y(Number(p.gewicht)),3.5,0,Math.PI*2);ctx.fill();});
+  ctx.textAlign='center';ctx.fillStyle='#766b55';if(pts.length<=8)pts.forEach((p,i)=>ctx.fillText(datumAnzeigen(p.datum),x(i),h-12));else{ctx.fillText(datumAnzeigen(pts[0].datum),pad.l,h-12);ctx.fillText(datumAnzeigen(pts[pts.length-1].datum),w-pad.r,h-12);}
+}
+function gewichtLoeschen(volkId,id){const v=daten.voelker.find(x=>String(x.id)===String(volkId));if(v&&confirm('Gewichtsmessung löschen?')){v.gewichte=(v.gewichte||[]).filter(x=>String(x.id)!==String(id));speichern();managementAnzeigen();}}
+function ernteLoeschen(id){if(confirm('Ernteeintrag löschen?')){daten.ernten=(daten.ernten||[]).filter(x=>String(x.id)!==String(id));speichern();managementAnzeigen();}}
+function koeniginEreignisLoeschen(id){if(confirm('Königinnenereignis löschen?')){daten.koeniginnenEreignisse=(daten.koeniginnenEreignisse||[]).filter(x=>String(x.id)!==String(id));speichern();managementAnzeigen();}}
+function zeitleisteAnzeigen(){
+  const target=document.getElementById('zeitleiste');if(!target)return;
+  const volkFilter=document.getElementById('timelineVolk')?.value||'', yearFilter=document.getElementById('timelineJahr')?.value||''; const events=[];
+  const add=(date,volk,type,detail)=>{if(!date|| (volkFilter&&String(volk.id)!==String(volkFilter)) || (yearFilter&&String(date).slice(0,4)!==yearFilter))return;events.push({date,volk:volk.name,type,detail});};
+  daten.voelker.forEach(v=>{(v.durchsichten||[]).forEach(x=>add(x.datum,v,'Durchsicht',`${x.staerke||'Stärke offen'} · Varroa ${x.varroa||'–'} Milben/Tag ${x.bemerkung?'· '+x.bemerkung:''}`));(v.behandlungen||[]).forEach(x=>add(x.beginn||x.ende,v,'Behandlung',`${x.mittel||'Mittel offen'} · ${x.art||''}`));(v.fuetterungen||[]).forEach(x=>add(x.datum,v,'Fütterung',`${x.menge||'–'} kg · ${x.form||''}`));(v.gewichte||[]).forEach(x=>add(x.datum,v,'Gewicht',`${x.gewicht} kg`));});
+  (daten.ernten||[]).forEach(x=>{const v=daten.voelker.find(y=>String(y.id)===String(x.volkId))||{id:'',name:'Unbekannt'};add(x.datum,v,'Honigernte',`${x.menge||'–'} kg · ${x.sorte||''}`)});
+  (daten.koeniginnenEreignisse||[]).forEach(x=>{const v=daten.voelker.find(y=>String(y.id)===String(x.volkId))||{id:'',name:'Unbekannt'};add(x.datum,v,'Königin',`${x.ereignis} · ${x.info||''}`)});
+  events.sort((a,b)=>String(b.date).localeCompare(String(a.date))); target.innerHTML=events.length?events.map(e=>`<div class="event-item"><strong>${datumAnzeigen(e.date)} · ${escapeHtml(e.type)}</strong><div class="small">${escapeHtml(e.volk)}</div><div>${escapeHtml(e.detail)}</div></div>`).join(''):'<p>Für die gewählten Filter gibt es noch keine Ereignisse.</p>';
+}
+function exportCsv(){
+  const rows=[['Typ','Datum','Volk','Standort','Details']];
+  daten.voelker.forEach(v=>{(v.durchsichten||[]).forEach(x=>rows.push(['Durchsicht',x.datum,v.name,v.standort,[x.staerke,x.brut,x.koenigin,x.futter,'Varroa/Tag: '+(x.varroa||''),x.bemerkung].join(' | ')]));(v.behandlungen||[]).forEach(x=>rows.push(['Behandlung',x.beginn,v.name,v.standort,[x.ende,x.mittel,x.art,x.dosierung,'Applikationen: '+(x.anzahl??''),'Vor: '+(x.milbenVor??''),'Während: '+(x.milbenWaehrend??''),'Nach: '+(x.milbenNach??''),x.bemerkung].join(' | ')]));(v.fuetterungen||[]).forEach(x=>rows.push(['Fütterung',x.datum,v.name,v.standort,[x.menge+' kg',x.form,x.bemerkung].join(' | ')]));(v.gewichte||[]).forEach(x=>rows.push(['Gewicht',x.datum,v.name,v.standort,[x.gewicht+' kg',x.bemerkung].join(' | ')]));});
+  (daten.ernten||[]).forEach(x=>{const v=daten.voelker.find(y=>String(y.id)===String(x.volkId));rows.push(['Ernte',x.datum,v?.name||'',v?.standort||'',[x.sorte,x.menge+' kg','Kosten: '+x.kosten,x.bemerkung].join(' | ')]);});
+  (daten.koeniginnenEreignisse||[]).forEach(x=>{const v=daten.voelker.find(y=>String(y.id)===String(x.volkId));rows.push(['Königin',x.datum,v?.name||'',v?.standort||'',[x.ereignis,x.info,x.bemerkung].join(' | ')]);});
+  const csv='\ufeff'+rows.map(r=>r.map(v=>'"'+String(v??'').replaceAll('"','""')+'"').join(';')).join('\r\n'); const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}); const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='bienenbuch-export-'+heute()+'.csv';a.click();URL.revokeObjectURL(a.href);
+}
+
 function vergleichAnzeigen() {
   const tbody = document.getElementById("vergleichTabelle");
   tbody.innerHTML = "";
@@ -1514,6 +1725,7 @@ function alleAnzeigen() {
   aktualisiereStandortAuswahl();
   standorteAnzeigen();
   aktualisiereVolkAuswahl();
+  managementAuswahlAktualisieren();
   gesamtUebersichtAnzeigen();
   herkunftGesamtTabelleAnzeigen();
   vergleichAnzeigen();
@@ -1544,6 +1756,11 @@ function importJson(e) {
   reader.readAsText(datei);
 }
 
+
+document.addEventListener('DOMContentLoaded', () => {
+  ['gDatum','eDatum','qDatum','aFaellig'].forEach(id=>{const el=document.getElementById(id);if(el&&!el.value)el.value=heute();});
+  managementAuswahlAktualisieren();
+});
 
 window.addEventListener("resize", () => {
   if (typeof daten === "undefined") return;
