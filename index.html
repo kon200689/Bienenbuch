@@ -228,6 +228,38 @@
   .legende span { display: inline-flex; align-items: center; gap: 5px; }
   .legende i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; }
 
+  /* Sprachsteuerung UI */
+  .sprach-box {
+    background: #fcf8ed;
+    border: 2px dashed var(--honig);
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .sprach-btn {
+    background: var(--honig);
+    color: var(--dunkel);
+    font-size: 15px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px;
+  }
+  .sprach-btn.zuhören {
+    background: var(--rot);
+    color: #fff;
+    animation: pulsieren 1.5s infinite;
+  }
+  @keyframes pulsieren {
+    0% { opacity: 1; }
+    50% { opacity: 0.6; }
+    100% { opacity: 1; }
+  }
+
   @media print { .no-print, button, nav, .actions { display:none !important; } body { background:#fff; } .card { box-shadow:none; break-inside:avoid; } }
   footer { max-width: 1200px; margin: 30px auto; padding: 0 18px; font-size: 11px; }
 </style>
@@ -399,6 +431,17 @@
 
       <section class="card">
         <h2>📝 Neue Durchsicht</h2>
+
+        <!-- Sprachassistent-Element -->
+        <div class="sprach-box">
+          <button type="button" id="speechBtn" class="sprach-btn" onclick="startSpracherfassung()">
+            🎙️ Spracherfassung starten
+          </button>
+          <div id="speechStatus" class="small">
+            Tippe auf den Button und sprich z. B.: <i>„Volk ist sehr stark, Stifte gesehen, Futter gut, Varroa 1.2, Wetter sonnig“</i>
+          </div>
+        </div>
+
         <div class="grid">
           <div><label for="dDatum">Datum</label><input type="date" id="dDatum"></div>
           <div><label for="dWetter">Wetter / Temp.</label><input id="dWetter"></div>
@@ -1242,6 +1285,107 @@ function dashboardAnzeigen() {
     `;
   }
   zeichneVarroaDiagrammExakt("varroaChart", volk.durchsichten);
+}
+
+/* ---------- Sprachsteuerung (Web Speech API) ---------- */
+let recognition = null;
+
+function startSpracherfassung() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const statusEl = document.getElementById("speechStatus");
+  const btn = document.getElementById("speechBtn");
+
+  if (!SpeechRecognition) {
+    alert("Dein Browser unterstützt leider keine direkte Sprachsteuerung. Verwende bitte das Mikrofon auf deiner Smartphone-Tastatur!");
+    return;
+  }
+
+  if (recognition) {
+    recognition.stop();
+    return;
+  }
+
+  recognition = new SpeechRecognition();
+  recognition.lang = "de-DE";
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
+
+  btn.classList.add("zuhören");
+  btn.innerHTML = "🔴 Zuhören... Sprich jetzt!";
+  statusEl.textContent = "Spracherfassung aktiv... (Sprich frei oder nenne Werte)";
+
+  recognition.onresult = (event) => {
+    const text = event.results[0][0].transcript;
+    statusEl.innerHTML = `<b>Erkannt:</b> „${escapeHtml(text)}“`;
+    verarbeiteSpracheingabe(text);
+  };
+
+  recognition.onerror = (event) => {
+    statusEl.textContent = "Fehler bei der Spracherkennung: " + event.error;
+    zuruecksetzenSprachUI();
+  };
+
+  recognition.onend = () => {
+    zuruecksetzenSprachUI();
+  };
+
+  recognition.start();
+}
+
+function zuruecksetzenSprachUI() {
+  recognition = null;
+  const btn = document.getElementById("speechBtn");
+  if (btn) {
+    btn.classList.remove("zuhören");
+    btn.innerHTML = "🎙️ Spracherfassung starten";
+  }
+}
+
+function verarbeiteSpracheingabe(text) {
+  const t = text.toLowerCase();
+
+  // Volksstärke
+  if (t.includes("sehr stark")) document.getElementById("dStaerke").value = "Sehr stark";
+  else if (t.includes("stark")) document.getElementById("dStaerke").value = "Stark";
+  else if (t.includes("mittel")) document.getElementById("dStaerke").value = "Mittel";
+  else if (t.includes("schwach")) document.getElementById("dStaerke").value = "Schwach";
+
+  // Brutbild
+  if (t.includes("keine brut")) document.getElementById("dBrut").value = "Keine Brut";
+  else if (t.includes("geschlossen")) document.getElementById("dBrut").value = "Geschlossenes Brutbild";
+  else if (t.includes("lückig") || t.includes("luckig")) document.getElementById("dBrut").value = "Lückig";
+  else if (t.includes("brut")) document.getElementById("dBrut").value = "Brut vorhanden";
+
+  // Königin & Zuchtstatus
+  if (t.includes("neue königin") || t.includes("neue koenigin") || t.includes("königin eingesetzt")) document.getElementById("dKoenigin").value = "Neue Königin eingesetzt";
+  else if (t.includes("stifte")) document.getElementById("dKoenigin").value = "Stifte gesehen";
+  else if (t.includes("weiselzelle")) document.getElementById("dKoenigin").value = "Weiselzellen";
+  else if (t.includes("weisellos")) document.getElementById("dKoenigin").value = "Verdacht weisellos";
+  else if (t.includes("umweiselung")) document.getElementById("dKoenigin").value = "Umweiselung";
+  else if (t.includes("begattung") || t.includes("belegstelle")) document.getElementById("dKoenigin").value = "Begattung / Belegstelle";
+  else if (t.includes("königin") || t.includes("koenigin") || t.includes("gesehen")) document.getElementById("dKoenigin").value = "Königin gesehen";
+
+  // Futtervorrat
+  if (t.includes("futter sehr wenig") || t.includes("wenig futter")) document.getElementById("dFutter").value = "Sehr wenig";
+  else if (t.includes("futter sehr gut")) document.getElementById("dFutter").value = "Sehr gut";
+  else if (t.includes("futter ausreichend")) document.getElementById("dFutter").value = "Ausreichend";
+  else if (t.includes("futter gut") || t.includes("futter")) document.getElementById("dFutter").value = "Gut";
+
+  // Varroawert (Zahl nach Varroa / Milben erkennen)
+  const varroaMatch = t.match(/(?:varroa|milben|befall)\s*(\d+(?:[.,]\d+)?)/i);
+  if (varroaMatch) {
+    document.getElementById("dVarroa").value = varroaMatch[1].replace(",", ".");
+  }
+
+  // Wetter
+  const wetterMatch = t.match(/(?:wetter|temperatur)\s*([^,.]+)/i);
+  if (wetterMatch) {
+    document.getElementById("dWetter").value = wetterMatch[1].trim();
+  }
+
+  // Gesamten Text als Notiz in Bemerkungen anhängen
+  const alt = document.getElementById("dBemerkung").value;
+  document.getElementById("dBemerkung").value = alt ? alt + "\n" + text : text;
 }
 
 /* ---------- Durchsichten & Königinnenereignis ---------- */
