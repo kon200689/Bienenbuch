@@ -765,15 +765,394 @@ function gesamtUebersichtAnzeigen() {
   }
 }
 
+
+
+/* ---------- Wiederhergestellte Diagrammlogik aus Stockkarte_alt ---------- */
+function varroaBewertung(datum, wert) {
+  if (!datum || wert === "" || wert === null || isNaN(parseFloat(wert))) {
+    return {
+      stufe: "Keine Daten",
+      farbe: "#6a6455",
+      hintergrund: "#f5f3f0",
+      richtwert: "–",
+      bereich: "–",
+      text: "Kein gültiger Varroawert erfasst."
+    };
+  }
+
+  const wertZahl = parseFloat(wert);
+  const monat = new Date(datum + "T00:00:00").getMonth();
+
+  if (monat >= 2 && monat <= 4) {
+    const bereich = "Frühjahr, März–Mai";
+    const richtwert = "ab 5 Milben/Tag";
+
+    if (wertZahl < 1) {
+      return erstelleBewertung("Grün", "#2e7d32", "#e8f5e9", richtwert, bereich);
+    }
+    if (wertZahl < 5) {
+      return erstelleBewertung("Gelb", "#c77700", "#fff8e1", richtwert, bereich);
+    }
+    return erstelleBewertung("Rot", "#b3261e", "#ffebee", richtwert, bereich);
+  }
+
+  if (monat >= 5 && monat <= 6) {
+    const bereich = "Sommer, Juni–Juli";
+    const richtwert = "ab 10 Milben/Tag";
+
+    if (wertZahl < 3) {
+      return erstelleBewertung("Grün", "#2e7d32", "#e8f5e9", richtwert, bereich);
+    }
+    if (wertZahl < 10) {
+      return erstelleBewertung("Gelb", "#c77700", "#fff8e1", richtwert, bereich);
+    }
+    return erstelleBewertung("Rot", "#b3261e", "#ffebee", richtwert, bereich);
+  }
+
+  if (monat >= 7 && monat <= 8) {
+    const bereich = "Spätsommer, August–September";
+    const richtwert = "ab 5 Milben/Tag";
+
+    if (wertZahl < 2) {
+      return erstelleBewertung("Grün", "#2e7d32", "#e8f5e9", richtwert, bereich);
+    }
+    if (wertZahl < 5) {
+      return erstelleBewertung("Gelb", "#c77700", "#fff8e1", richtwert, bereich);
+    }
+    return erstelleBewertung("Rot", "#b3261e", "#ffebee", richtwert, bereich);
+  }
+
+  const bereich = "Herbst/Winter, Oktober–Februar";
+  const richtwert = "ab 1 Milbe/Tag";
+
+  if (wertZahl < 0.5) {
+    return erstelleBewertung("Grün", "#2e7d32", "#e8f5e9", richtwert, bereich);
+  }
+  if (wertZahl < 1) {
+    return erstelleBewertung("Gelb", "#c77700", "#fff8e1", richtwert, bereich);
+  }
+  return erstelleBewertung("Rot", "#b3261e", "#ffebee", richtwert, bereich);
+
+  function erstelleBewertung(stufe, farbe, hintergrund, richtwert, bereich) {
+    return {
+      stufe: stufe,
+      farbe: farbe,
+      hintergrund: hintergrund,
+      richtwert: richtwert,
+      bereich: bereich,
+      text: stufe + " für " + bereich + " · Richtwert: " + richtwert
+    };
+  }
+}
+
+function holePunkte(durchsichten) {
+  return durchsichten
+    .filter(d => d.varroa !== "" && d.varroa !== null && !isNaN(parseFloat(d.varroa)))
+    .map(d => ({
+      datum: d.datum,
+      wert: parseFloat(d.varroa)
+    }))
+    .sort((a, b) => a.datum.localeCompare(b.datum));
+}
+
+function canvasVorbereiten(canvas) {
+  const ctx = canvas.getContext("2d");
+  const box = canvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+
+  canvas.width = box.width * dpr;
+  canvas.height = box.height * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  const w = box.width;
+  const h = box.height;
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, w, h);
+
+  return { ctx, w, h };
+}
+
+function zeichneDatumsAchse(ctx, datumsListe, xPos, w, h, randUnten) {
+  ctx.fillStyle = "#7a7057";
+  ctx.font = "10px system-ui, Arial";
+  ctx.textAlign = "center";
+
+  const n = datumsListe.length;
+  if (!n) return;
+
+  const labels = datumsListe.map(d => formatDatumKurz(d));
+  const halbe = labels.map(t => ctx.measureText(t).width / 2);
+  const abstand = 10;
+
+  const indizes = [0];
+
+  for (let i = 1; i < n - 1; i++) {
+    const x = xPos(datumsListe[i]);
+    const letzter = indizes[indizes.length - 1];
+    const xLetzter = xPos(datumsListe[letzter]);
+
+    if (x - halbe[i] - (xLetzter + halbe[letzter]) >= abstand) {
+      indizes.push(i);
+    }
+  }
+
+  if (n > 1) {
+    const letzter = indizes[indizes.length - 1];
+    const xLetzter = xPos(datumsListe[letzter]);
+    const xEnde = xPos(datumsListe[n - 1]);
+
+    if (xEnde - halbe[n - 1] - (xLetzter + halbe[letzter]) >= abstand) {
+      indizes.push(n - 1);
+    } else {
+      indizes.pop();
+      indizes.push(n - 1);
+    }
+  }
+
+  indizes.forEach(index => {
+    const x = xPos(datumsListe[index]);
+    ctx.fillText(labels[index], x, h - randUnten + 18);
+  });
+}
+
+function zeichneVarroaDiagramm(durchsichten) {
+  const canvas = document.getElementById("varroaChart");
+  if (!canvas) return;
+  const punkte = holePunkte(durchsichten || []);
+  const { ctx, w, h } = canvasVorbereiten(canvas);
+
+  if (!punkte.length) {
+    ctx.fillStyle = "#7a7057";
+    ctx.font = "14px system-ui, Arial";
+    ctx.textAlign = "center";
+    ctx.fillText("Noch keine Varroa-Werte erfasst.", w / 2, h / 2);
+    return;
+  }
+
+  const maxWert = Math.max(...punkte.map(p => p.wert));
+  const yMax = Math.max(2, Math.ceil((maxWert + 1) / 2) * 2);
+
+  const randLinks = 50;
+  const randRechts = 20;
+  const randOben = 20;
+  const randUnten = 45;
+  const plotBreite = w - randLinks - randRechts;
+  const plotHoehe = h - randOben - randUnten;
+
+  function xPos(index) {
+    return punkte.length === 1
+      ? randLinks + plotBreite / 2
+      : randLinks + (index / (punkte.length - 1)) * plotBreite;
+  }
+
+  function yPos(wert) {
+    return randOben + plotHoehe - (wert / yMax) * plotHoehe;
+  }
+
+  ctx.strokeStyle = "#e6e0d0";
+  ctx.fillStyle = "#7a7057";
+  ctx.font = "11px system-ui, Arial";
+  ctx.textAlign = "right";
+
+  for (let wert = 0; wert <= yMax; wert += 2) {
+    const y = yPos(wert);
+
+    ctx.beginPath();
+    ctx.moveTo(randLinks, y);
+    ctx.lineTo(w - randRechts, y);
+    ctx.stroke();
+
+    ctx.fillText(wert, randLinks - 8, y + 4);
+  }
+
+  ctx.strokeStyle = "#1f6f8b";
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+
+  punkte.forEach((punkt, index) => {
+    const x = xPos(index);
+    const y = yPos(punkt.wert);
+
+    if (index === 0) {
+      ctx.moveTo(x, y);
+    } else {
+      ctx.lineTo(x, y);
+    }
+  });
+
+  ctx.stroke();
+
+  punkte.forEach((punkt, index) => {
+    const x = xPos(index);
+    const y = yPos(punkt.wert);
+    const bewertung = varroaBewertung(punkt.datum, punkt.wert);
+
+    ctx.beginPath();
+    ctx.arc(x, y, 6, 0, Math.PI * 2);
+    ctx.fillStyle = bewertung.farbe;
+    ctx.fill();
+
+    ctx.fillStyle = "#2d2a23";
+    ctx.font = "bold 11px system-ui, Arial";
+    ctx.textAlign = "center";
+    ctx.fillText(punkt.wert, x, y - 12);
+  });
+
+  zeichneDatumsAchse(ctx, punkte.map(p => p.datum), d => xPos(punkte.findIndex(p => p.datum === d)), w, h, randUnten);
+}
+
+function zeichneVergleichsDiagramm() {
+  const canvas = document.getElementById("vergleichChart");
+  if (!canvas) return;
+
+  const farben = [
+    "#1f6f8b",
+    "#b3261e",
+    "#2e7d32",
+    "#c77700",
+    "#6a4c93",
+    "#00838f",
+    "#8d6e63",
+    "#5d4037"
+  ];
+
+  const reihen = daten.voelker
+    .map((volk, index) => ({
+      name: volk.name,
+      punkte: holePunkte(volk.durchsichten),
+      farbe: farben[index % farben.length]
+    }))
+    .filter(reihe => reihe.punkte.length > 0);
+
+  const { ctx, w, h } = canvasVorbereiten(canvas);
+
+  const legende = document.getElementById("vergleichLegende");
+  legende.replaceChildren();
+
+  if (!reihen.length) {
+    ctx.fillStyle = "#7a7057";
+    ctx.font = "14px system-ui, Arial";
+    ctx.textAlign = "center";
+    ctx.fillText("Noch keine Varroa-Werte erfasst.", w / 2, h / 2);
+    return;
+  }
+
+  const allePunkte = reihen.flatMap(reihe => reihe.punkte);
+  const datumsListe = [...new Set(allePunkte.map(punkt => punkt.datum))].sort();
+
+  const maxWert = Math.max(...allePunkte.map(punkt => punkt.wert));
+  const yMax = Math.max(2, Math.ceil((maxWert + 1) / 2) * 2);
+
+  const randLinks = 55;
+  const randRechts = 20;
+  const randOben = 25;
+  const randUnten = 45;
+  const plotBreite = w - randLinks - randRechts;
+  const plotHoehe = h - randOben - randUnten;
+
+  function xPos(datum) {
+    return datumsListe.length === 1
+      ? randLinks + plotBreite / 2
+      : randLinks + (datumsListe.indexOf(datum) / (datumsListe.length - 1)) * plotBreite;
+  }
+
+  function yPos(wert) {
+    return randOben + plotHoehe - (wert / yMax) * plotHoehe;
+  }
+
+  ctx.strokeStyle = "#e6e0d0";
+  ctx.fillStyle = "#7a7057";
+  ctx.font = "11px system-ui, Arial";
+  ctx.textAlign = "right";
+
+  for (let wert = 0; wert <= yMax; wert += 2) {
+    const y = yPos(wert);
+
+    ctx.beginPath();
+    ctx.moveTo(randLinks, y);
+    ctx.lineTo(w - randRechts, y);
+    ctx.stroke();
+
+    ctx.fillText(wert, randLinks - 8, y + 4);
+  }
+
+  reihen.forEach(reihe => {
+    ctx.strokeStyle = reihe.farbe;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+
+    reihe.punkte.forEach((punkt, index) => {
+      const x = xPos(punkt.datum);
+      const y = yPos(punkt.wert);
+
+      if (index === 0) {
+        ctx.moveTo(x, y);
+      } else {
+        ctx.lineTo(x, y);
+      }
+    });
+
+    ctx.stroke();
+
+    reihe.punkte.forEach(punkt => {
+      const x = xPos(punkt.datum);
+      const y = yPos(punkt.wert);
+      const bewertung = varroaBewertung(punkt.datum, punkt.wert);
+
+      ctx.beginPath();
+      ctx.arc(x, y, 5, 0, Math.PI * 2);
+      ctx.fillStyle = bewertung.farbe;
+      ctx.fill();
+    });
+  });
+
+  zeichneDatumsAchse(ctx, datumsListe, xPos, w, h, randUnten);
+
+  reihen.forEach(reihe => {
+    const span = document.createElement("span");
+
+    const swatch = document.createElement("i");
+    swatch.style.background = reihe.farbe;
+    span.appendChild(swatch);
+
+    span.appendChild(document.createTextNode(reihe.name));
+    legende.appendChild(span);
+  });
+}
+
+function formatDatumKurz(datum) {
+  if (!datum) return "";
+
+  const d = new Date(datum + "T00:00:00");
+  return d.toLocaleDateString("de-DE", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "2-digit"
+  });
+}
+
 function dashboardAnzeigen() {
-  const volk = daten.voelker.find(v => v.id === aktivesVolk);
+  const volk = daten.voelker.find(v => String(v.id) === String(aktivesVolk));
   if (!volk) return;
+  if (!Array.isArray(volk.durchsichten)) volk.durchsichten = [];
+
   const kpi = document.getElementById("kpiBereich");
   if (kpi) {
+    const punkte = holePunkte(volk.durchsichten);
+    const letzter = punkte.length ? punkte[punkte.length - 1].wert : null;
+    const maximum = punkte.length ? Math.max(...punkte.map(p => p.wert)) : null;
+    const durchschnitt = punkte.length
+      ? (punkte.reduce((sum, p) => sum + p.wert, 0) / punkte.length).toFixed(1)
+      : null;
     kpi.innerHTML = `
       <div class="kpi"><small>Durchsichten</small><strong>${volk.durchsichten.length}</strong></div>
+      <div class="kpi"><small>Letzte Varroa-Messung</small><strong>${letzter !== null ? letzter + " / Tag" : "–"}</strong></div>
+      <div class="kpi"><small>Höchster Varroa-Wert</small><strong>${maximum !== null ? maximum + " / Tag" : "–"}</strong></div>
+      <div class="kpi"><small>Durchschnitt Varroa</small><strong>${durchschnitt !== null ? durchschnitt + " / Tag" : "–"}</strong></div>
     `;
   }
+  zeichneVarroaDiagramm(volk.durchsichten);
 }
 
 /* ---------- Durchsichten ---------- */
@@ -793,6 +1172,8 @@ function durchsichtSpeichern() {
   speichern();
   dashboardAnzeigen();
   durchsichtenAnzeigen();
+  vergleichAnzeigen();
+  gesamtUebersichtAnzeigen();
 }
 
 function durchsichtenAnzeigen() {
@@ -812,7 +1193,7 @@ function durchsichtenAnzeigen() {
 
 function durchsichtLoeschen(i) {
   const volk = daten.voelker.find(v => v.id === aktivesVolk);
-  if (volk && confirm("Löschen?")) { volk.durchsichten.splice(i, 1); speichern(); durchsichtenAnzeigen(); }
+  if (volk && confirm("Löschen?")) { volk.durchsichten.splice(i, 1); speichern(); dashboardAnzeigen(); durchsichtenAnzeigen(); vergleichAnzeigen(); }
 }
 
 function volkLoeschen() {
@@ -941,28 +1322,99 @@ function fuetterungLoeschen(i) {
 }
 
 function vergleichAnzeigen() {
-  const tb = document.getElementById("vergleichTabelle");
-  if (!tb) return;
+  const tbody = document.getElementById("vergleichTabelle");
+  tbody.innerHTML = "";
+
   if (!daten.voelker.length) {
-    tb.innerHTML = `<tr><td colspan="9">Noch keine Völker angelegt.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9">Noch keine Völker angelegt.</td></tr>`;
+    zeichneVergleichsDiagramm();
     return;
   }
-  tb.innerHTML = daten.voelker.map(volk => {
-    const letzte = volk.durchsichten[0];
-    return `
-      <tr>
-        <td><strong>${escapeHtml(volk.name)}</strong></td>
-        <td>${escapeHtml(volk.standort || "–")}</td>
-        <td>${letzte ? escapeHtml(letzte.datum) : "–"}</td>
-        <td>${letzte && letzte.staerke ? escapeHtml(letzte.staerke) : "–"}</td>
-        <td>${letzte && letzte.futter ? escapeHtml(letzte.futter) : "–"}</td>
-        <td>${letzte && letzte.varroa ? escapeHtml(letzte.varroa) + " / Tag" : "–"}</td>
-        <td>–</td>
-        <td><span class="ampel-badge" style="background:#e8f5e9;color:#2e7d32">Grün</span></td>
-        <td><button onclick="volkOeffnen(${volk.id})">Öffnen</button></td>
-      </tr>
+
+  daten.voelker.forEach(volk => {
+    const ds = [...volk.durchsichten].sort((a, b) => a.datum.localeCompare(b.datum));
+    const letzte = ds[ds.length - 1];
+
+    const varroaWerte = ds
+      .filter(d => d.varroa !== "" && d.varroa !== null && !isNaN(parseFloat(d.varroa)))
+      .map(d => parseFloat(d.varroa));
+
+    const letzteVarroa = varroaWerte.length ? varroaWerte[varroaWerte.length - 1] : null;
+    const vorherigeVarroa = varroaWerte.length > 1 ? varroaWerte[varroaWerte.length - 2] : null;
+
+    const letzteMessung = [...ds]
+      .reverse()
+      .find(d => d.varroa !== "" && d.varroa !== null && !isNaN(parseFloat(d.varroa)));
+
+    let trend = "–";
+    let trendFarbe = "#7a7057";
+
+    if (letzteVarroa !== null && vorherigeVarroa !== null) {
+      if (letzteVarroa > vorherigeVarroa) {
+        trend = "steigend ▲";
+        trendFarbe = "#b3261e";
+      } else if (letzteVarroa < vorherigeVarroa) {
+        trend = "fallend ▼";
+        trendFarbe = "#2e7d32";
+      } else {
+        trend = "gleichbleibend ●";
+      }
+    }
+
+    const ampel = letzteMessung
+      ? varroaBewertung(letzteMessung.datum, letzteMessung.varroa)
+      : varroaBewertung("", "");
+
+    let bewertung = ampel.stufe;
+    let bewertungsFarbe = ampel.farbe;
+    let bewertungsHintergrund = ampel.hintergrund;
+
+    if (
+      ampel.stufe !== "Rot" &&
+      letzte &&
+      letzte.futter === "Sehr wenig"
+    ) {
+      bewertung = "Futter kritisch";
+      bewertungsFarbe = "#b3261e";
+      bewertungsHintergrund = "#ffebee";
+    } else if (
+      ampel.stufe === "Grün" &&
+      letzte &&
+      letzte.schwarm &&
+      letzte.schwarm !== "Keiner"
+    ) {
+      bewertung = "Schwarm beobachten";
+      bewertungsFarbe = "#c77700";
+      bewertungsHintergrund = "#fff8e1";
+    }
+
+    const tr = document.createElement("tr");
+
+    tr.innerHTML = `
+      <td><strong>${escapeHtml(volk.name)}</strong></td>
+      <td>${escapeHtml(volk.standort || "–")}</td>
+      <td>${letzte ? escapeHtml(letzte.datum) : "–"}</td>
+      <td>${letzte && letzte.staerke ? escapeHtml(letzte.staerke) : "–"}</td>
+      <td>${letzte && letzte.futter ? escapeHtml(letzte.futter) : "–"}</td>
+      <td>${letzteVarroa !== null ? letzteVarroa + " / Tag" : "–"}</td>
+      <td style="color:${trendFarbe};font-weight:700">${trend}</td>
+      <td>
+        <span class="ampel-badge" style="
+          background:${bewertungsHintergrund};
+          color:${bewertungsFarbe};
+        ">
+          ${escapeHtml(bewertung)}
+        </span>
+        <br>
+        <span class="small">${escapeHtml(ampel.richtwert)}</span>
+      </td>
+      <td><button onclick="volkOeffnen(${volk.id})">Öffnen</button></td>
     `;
-  }).join("");
+
+    tbody.appendChild(tr);
+  });
+
+  zeichneVergleichsDiagramm();
 }
 
 function alleAnzeigen() {
@@ -998,6 +1450,13 @@ function importJson(e) {
   };
   reader.readAsText(datei);
 }
+
+
+window.addEventListener("resize", () => {
+  if (typeof daten === "undefined") return;
+  if (aktuellerReiter === "dashboard") vergleichAnzeigen();
+  if (aktuellerReiter === "stockkarte" && aktivesVolk !== null) dashboardAnzeigen();
+});
 
 function escapeHtml(text) {
   return String(text ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
