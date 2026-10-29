@@ -157,6 +157,9 @@
   h3 { margin-bottom: 8px; font-size: 16px; }
 
   .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+  .milbenwerte-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .milbenwerte-grid > div { min-width: 0; }
+  @media (max-width: 680px) { .milbenwerte-grid { grid-template-columns: 1fr; } }
   .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(175px, 1fr)); gap: 12px; }
 
   .kpi {
@@ -255,7 +258,7 @@
   <!-- ================= Reiter: Dashboard ================= -->
   <section id="reiter-dashboard" class="reiter">
     <section class="card">
-      <h2>📊 Gesamtübersicht</h2>
+      <div class="row" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap"><h2>📊 Gesamtübersicht</h2><button type="button" class="secondary" onclick="dashboardAktualisieren()">↻ Dashboard aktualisieren</button></div>
       <div class="kpi-grid" id="gesamtKpi"></div>
       <div id="gesamtHinweise"></div>
     </section>
@@ -402,7 +405,8 @@
         </div>
         <div style="margin-top:12px"><label for="dBemerkung">Bemerkungen</label><textarea id="dBemerkung"></textarea></div>
         <div class="actions">
-          <button class="green" onclick="durchsichtSpeichern()">Durchsicht speichern</button>
+          <button class="green" id="durchsichtSpeichernBtn" onclick="durchsichtSpeichern()">Durchsicht speichern</button>
+          <button class="secondary hidden" id="durchsichtAbbrechenBtn" onclick="durchsichtFormZuruecksetzen()">Bearbeiten abbrechen</button>
           <button class="danger" onclick="volkLoeschen()">Volk löschen</button>
         </div>
       </section>
@@ -411,7 +415,7 @@
         <h2>📚 Durchsichten</h2>
         <div style="overflow-x:auto">
           <table>
-            <thead><tr><th>Datum</th><th>Stärke</th><th>Brut</th><th>Königin</th><th>Futter</th><th>Varroa</th><th>Ampel</th><th>Bemerkung</th><th></th></tr></thead>
+            <thead><tr><th>Datum</th><th>Stärke</th><th>Brut</th><th>Königin</th><th>Futter</th><th>Varroa</th><th>Ampel</th><th>Bemerkung</th><th>Bearbeiten</th><th></th></tr></thead>
             <tbody id="durchsichten"></tbody>
           </table>
         </div>
@@ -431,9 +435,11 @@
         <h2 id="herkunftTitelForm">👑 Herkunft & Zuchtdaten</h2>
         <div class="grid">
           <div><label for="hMuttervolk">Muttervolk / Abstammung</label><input id="hMuttervolk"></div>
-          <div><label for="hRasse">Rasse / Linie</label><input id="hRasse" placeholder="Carnica, Buckfast..."></div>
+          <div><label for="hRasse">Rasse / Linie</label><input id="hRasse" list="hRasseListe" placeholder="Carnica, Buckfast...">
+            <datalist id="hRasseListe"><option value="Carnica"></option><option value="Buckfast"></option><option value="Ligustica (Italienische Biene)"></option><option value="Mellifera (Dunkle Biene)"></option><option value="Kärntner Biene"></option><option value="Kreuzung / Hybrid"></option><option value="Unbekannt"></option></datalist></div>
           <div><label for="hSchlupfdatum">Schlupfdatum</label><input type="date" id="hSchlupfdatum"></div>
-          <div><label for="hBegattungsart">Begattungsart</label><input id="hBegattungsart" placeholder="Standbegattet, Belegstelle..."></div>
+          <div><label for="hBegattungsart">Begattungsart</label><input id="hBegattungsart" list="hBegattungsartListe" placeholder="Standbegattet, Belegstelle...">
+            <datalist id="hBegattungsartListe"><option value="Standbegattet"></option><option value="Belegstelle"></option><option value="Inselbelegstelle"></option><option value="Instrumentelle Besamung"></option><option value="Unbekannt"></option></datalist></div>
           <div><label for="hBelegstelle">Belegstelle Name</label><input id="hBelegstelle"></div>
           <div><label for="hZuechter">Züchter / Herkunft</label><input id="hZuechter"></div>
         </div>
@@ -464,10 +470,17 @@
       <section class="card">
         <h2>➕ Behandlung eintragen</h2>
         <div class="grid">
-          <div><label for="bMittel">Behandlungsmittel</label><input id="bMittel" placeholder="Ameisensäure, Oxalsäure..."></div>
+          <div><label for="bMittel">Behandlungsmittel (freie Eingabe)</label><input id="bMittel" list="bMittelListe" placeholder="Ameisensäure, Oxalsäure, Thymol …"><datalist id="bMittelListe"><option value="Ameisensäure"></option><option value="Oxalsäure"></option><option value="Thymol"></option><option value="Milchsäure"></option><option value="Bio-technisch (kein Mittel)"></option></datalist></div>
+          <div><label for="bArt">Behandlungsart</label><select id="bArt"><option value="">– bitte wählen –</option><option>Verdunster (Langzeit)</option><option>Verdunster / Vergaser (Kurzzeit)</option><option>Träufelung</option><option>Sublimation / Vernebelung</option><option>Sprühverfahren</option><option>Bio-technisch (z. B. Drohnenrahmen, Brutentnahme)</option><option>Sonstiges</option></select></div>
           <div><label for="bBeginn">Beginn</label><input type="date" id="bBeginn"></div>
           <div><label for="bEnde">Ende</label><input type="date" id="bEnde"></div>
-          <div><label for="bDosierung">Dosierung</label><input id="bDosierung"></div>
+          <div><label for="bDosierung">Dosierung</label><input id="bDosierung" placeholder="z. B. 1 Verdunster, 5 ml pro Wabengasse"></div>
+          <div><label for="bAnzahl">Anzahl der Applikationen</label><input type="number" step="1" min="0" id="bAnzahl" placeholder="z. B. 3"></div>
+        </div>
+        <div class="milbenwerte-grid" style="margin-top:12px">
+          <div><label for="bMilbenVor">Milbenfall VOR der Behandlung (Milben/Tag)</label><input type="number" step="0.1" min="0" id="bMilbenVor" placeholder="z. B. 8"></div>
+          <div><label for="bMilbenWaehrend">Milbenfall WÄHREND der Behandlung (Milben/Tag)</label><input type="number" step="0.1" min="0" id="bMilbenWaehrend" placeholder="z. B. 20"></div>
+          <div><label for="bMilbenNach">Milbenfall NACH der Behandlung (Milben/Tag)</label><input type="number" step="0.1" min="0" id="bMilbenNach" placeholder="z. B. 1"></div>
         </div>
         <div style="margin-top:12px"><label for="bBemerkung">Bemerkungen</label><textarea id="bBemerkung"></textarea></div>
         <div class="actions"><button class="green" onclick="behandlungSpeichern()">Behandlung speichern</button></div>
@@ -477,7 +490,7 @@
         <h2>Behandlungen</h2>
         <div style="overflow-x:auto">
           <table>
-            <thead><tr><th>Beginn</th><th>Ende</th><th>Mittel</th><th>Dosierung</th><th>Bemerkung</th><th></th></tr></thead>
+            <thead><tr><th>Beginn</th><th>Ende</th><th>Mittel</th><th>Art</th><th>Dosierung</th><th>Applikationen</th><th>Milben/Tag vor</th><th>Milben/Tag während</th><th>Milben/Tag nach</th><th>Bemerkung</th><th></th></tr></thead>
             <tbody id="behandlungen"></tbody>
           </table>
         </div>
@@ -610,6 +623,7 @@ passwortPruefen();
 
 let aktivesVolk = null;
 let aktuellerReiter = "dashboard";
+let bearbeiteDurchsichtIndex = null;
 
 function datenstrukturAbsichern() {
   if (!Array.isArray(daten.standorte)) daten.standorte = [];
@@ -638,6 +652,17 @@ function zeigeReiter(name) {
 }
 
 function heute() { return new Date().toISOString().slice(0, 10); }
+function datumAnzeigen(datum) {
+  if (!datum) return "–";
+  const teile = String(datum).slice(0, 10).split("-");
+  return teile.length === 3 ? `${teile[2]}-${teile[1]}-${teile[0]}` : String(datum);
+}
+function dashboardAktualisieren() {
+  datenstrukturAbsichern();
+  gesamtUebersichtAnzeigen();
+  vergleichAnzeigen();
+  if (typeof initMapUebersicht === "function") initMapUebersicht();
+}
 
 /* ---------- Standorte ---------- */
 let mapAuswahl = null, markerAuswahl = null, mapUebersicht = null, uebersichtMarkerEbene = null;
@@ -671,11 +696,21 @@ function initMapUebersicht() {
 function aktualisiereUebersichtKarte() {
   if (!uebersichtMarkerEbene) return;
   uebersichtMarkerEbene.clearLayers();
+  const bounds = [];
   daten.standorte.forEach(st => {
-    if (st.lat && st.lng) {
-      L.marker([st.lat, st.lng]).bindPopup(`<b>${escapeHtml(st.name)}</b>`).addTo(uebersichtMarkerEbene);
+    if (st.lat !== "" && st.lng !== "" && Number.isFinite(Number(st.lat)) && Number.isFinite(Number(st.lng))) {
+      const latLng = [Number(st.lat), Number(st.lng)];
+      bounds.push(latLng);
+      const anzahlVoelker = daten.voelker.filter(v => v.standort === st.name).length;
+      L.marker(latLng).bindPopup(`<b>${escapeHtml(st.name)}</b><br>${anzahlVoelker} Volk(er) zugeordnet`).addTo(uebersichtMarkerEbene);
     }
   });
+  if (mapUebersicht) {
+    mapUebersicht.invalidateSize();
+    if (bounds.length > 1) mapUebersicht.fitBounds(bounds, { padding: [30, 30], maxZoom: 14 });
+    else if (bounds.length === 1) mapUebersicht.setView(bounds[0], 13);
+    else mapUebersicht.setView([51.1657, 10.4515], 6);
+  }
 }
 
 function standortSpeichern() {
@@ -1156,44 +1191,80 @@ function dashboardAnzeigen() {
 }
 
 /* ---------- Durchsichten ---------- */
+function durchsichtFormZuruecksetzen() {
+  bearbeiteDurchsichtIndex = null;
+  const titel = document.querySelector('#volkBereich h2');
+  const button = document.getElementById('durchsichtSpeichernBtn');
+  if (button) button.textContent = 'Durchsicht speichern';
+  const abbrechen = document.getElementById('durchsichtAbbrechenBtn');
+  if (abbrechen) abbrechen.classList.add('hidden');
+  ['dWetter','dVarroa','dBemerkung'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  ['dStaerke','dBrut','dKoenigin','dFutter'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  const datum = document.getElementById('dDatum'); if (datum) datum.value = heute();
+}
 function durchsichtSpeichern() {
-  const volk = daten.voelker.find(v => v.id === aktivesVolk);
+  const volk = daten.voelker.find(v => String(v.id) === String(aktivesVolk));
   if (!volk) return;
-  volk.durchsichten.unshift({
-    datum: document.getElementById("dDatum").value || heute(),
-    wetter: document.getElementById("dWetter").value,
-    staerke: document.getElementById("dStaerke").value,
-    brut: document.getElementById("dBrut").value,
-    koenigin: document.getElementById("dKoenigin").value,
-    futter: document.getElementById("dFutter").value,
-    varroa: document.getElementById("dVarroa").value,
-    bemerkung: document.getElementById("dBemerkung").value
-  });
+  if (!Array.isArray(volk.durchsichten)) volk.durchsichten = [];
+  const eintrag = {
+    datum: document.getElementById('dDatum').value || heute(),
+    wetter: document.getElementById('dWetter').value,
+    staerke: document.getElementById('dStaerke').value,
+    brut: document.getElementById('dBrut').value,
+    koenigin: document.getElementById('dKoenigin').value,
+    futter: document.getElementById('dFutter').value,
+    varroa: document.getElementById('dVarroa').value,
+    bemerkung: document.getElementById('dBemerkung').value
+  };
+  if (bearbeiteDurchsichtIndex !== null) volk.durchsichten[bearbeiteDurchsichtIndex] = eintrag;
+  else volk.durchsichten.push(eintrag);
   speichern();
-  dashboardAnzeigen();
-  durchsichtenAnzeigen();
-  vergleichAnzeigen();
-  gesamtUebersichtAnzeigen();
+  durchsichtFormZuruecksetzen();
+  dashboardAnzeigen(); durchsichtenAnzeigen(); vergleichAnzeigen(); gesamtUebersichtAnzeigen();
 }
-
+function durchsichtBearbeiten(index) {
+  const volk = daten.voelker.find(v => String(v.id) === String(aktivesVolk));
+  const d = volk?.durchsichten?.[index];
+  if (!d) return;
+  bearbeiteDurchsichtIndex = index;
+  document.getElementById('dDatum').value = d.datum || heute();
+  document.getElementById('dWetter').value = d.wetter || '';
+  document.getElementById('dStaerke').value = d.staerke || '';
+  document.getElementById('dBrut').value = d.brut || '';
+  document.getElementById('dKoenigin').value = d.koenigin || '';
+  document.getElementById('dFutter').value = d.futter || '';
+  document.getElementById('dVarroa').value = d.varroa ?? '';
+  document.getElementById('dBemerkung').value = d.bemerkung || '';
+  document.getElementById('durchsichtSpeichernBtn').textContent = 'Änderungen speichern';
+  document.getElementById('durchsichtAbbrechenBtn').classList.remove('hidden');
+  document.getElementById('dDatum').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
 function durchsichtenAnzeigen() {
-  const volk = daten.voelker.find(v => v.id === aktivesVolk);
-  const tb = document.getElementById("durchsichten");
+  const volk = daten.voelker.find(v => String(v.id) === String(aktivesVolk));
+  const tb = document.getElementById('durchsichten');
   if (!tb) return;
-  if (!volk || !volk.durchsichten.length) return tb.innerHTML = "<tr><td colspan='9'>Keine Durchsichten.</td></tr>";
-  tb.innerHTML = volk.durchsichten.map((d, i) => `
-    <tr>
-      <td>${d.datum}</td><td>${escapeHtml(d.staerke)}</td><td>${escapeHtml(d.brut)}</td>
-      <td>${escapeHtml(d.koenigin)}</td><td>${escapeHtml(d.futter)}</td><td>${d.varroa || "–"}</td>
-      <td>🟢</td><td>${escapeHtml(d.bemerkung)}</td>
-      <td><button class="danger" onclick="durchsichtLoeschen(${i})">✕</button></td>
-    </tr>
-  `).join("");
+  if (!volk || !volk.durchsichten?.length) return tb.innerHTML = "<tr><td colspan='10'>Keine Durchsichten.</td></tr>";
+  const sortiert = volk.durchsichten.map((d, index) => ({ d, index })).sort((a,b) => String(b.d.datum || '').localeCompare(String(a.d.datum || '')));
+  tb.innerHTML = sortiert.map(({d,index}) => {
+    const ampel = varroaBewertung(d.datum, d.varroa);
+    return `<tr>
+      <td>${datumAnzeigen(d.datum)}${d.wetter ? `<br><span class="small">${escapeHtml(d.wetter)}</span>` : ''}</td>
+      <td>${escapeHtml(d.staerke)}</td><td>${escapeHtml(d.brut)}</td><td>${escapeHtml(d.koenigin)}</td><td>${escapeHtml(d.futter)}</td>
+      <td>${d.varroa !== '' && d.varroa != null ? escapeHtml(d.varroa) : '–'}</td>
+      <td><span class="ampel-badge" style="background:${ampel.hintergrund};color:${ampel.farbe}">${escapeHtml(ampel.stufe)}</span></td>
+      <td>${escapeHtml(d.bemerkung)}</td>
+      <td><button type="button" onclick="durchsichtBearbeiten(${index})">✎ Bearbeiten</button></td>
+      <td><button class="danger" onclick="durchsichtLoeschen(${index})">✕</button></td>
+    </tr>`;
+  }).join('');
 }
-
-function durchsichtLoeschen(i) {
-  const volk = daten.voelker.find(v => v.id === aktivesVolk);
-  if (volk && confirm("Löschen?")) { volk.durchsichten.splice(i, 1); speichern(); dashboardAnzeigen(); durchsichtenAnzeigen(); vergleichAnzeigen(); }
+function durchsichtLoeschen(index) {
+  const volk = daten.voelker.find(v => String(v.id) === String(aktivesVolk));
+  if (volk && confirm('Diese Durchsicht wirklich löschen?')) {
+    volk.durchsichten.splice(index, 1);
+    if (bearbeiteDurchsichtIndex === index) durchsichtFormZuruecksetzen();
+    speichern(); dashboardAnzeigen(); durchsichtenAnzeigen(); vergleichAnzeigen(); gesamtUebersichtAnzeigen();
+  }
 }
 
 function volkLoeschen() {
@@ -1265,11 +1336,31 @@ function behandlungSpeichern() {
   const id = Number(document.getElementById("bVolk").value);
   const volk = daten.voelker.find(v => v.id === id);
   if (!volk) return;
+  const anzahlRaw = document.getElementById("bAnzahl").value;
+  const milbenVorRaw = document.getElementById("bMilbenVor").value;
+  const milbenWaehrendRaw = document.getElementById("bMilbenWaehrend").value;
+  const milbenNachRaw = document.getElementById("bMilbenNach").value;
+  const anzahl = anzahlRaw === "" ? "" : Number(anzahlRaw);
+  const milbenVor = milbenVorRaw === "" ? "" : Number(milbenVorRaw);
+  const milbenWaehrend = milbenWaehrendRaw === "" ? "" : Number(milbenWaehrendRaw);
+  const milbenNach = milbenNachRaw === "" ? "" : Number(milbenNachRaw);
+  if (anzahl !== "" && (!Number.isInteger(anzahl) || anzahl < 0)) {
+    alert("Bitte bei Anzahl der Applikationen eine ganze Zahl ab 0 eingeben."); return;
+  }
+  if ([milbenVor, milbenWaehrend, milbenNach].some(w => w !== "" && (!Number.isFinite(w) || w < 0))) {
+    alert("Bitte bei den Milbenfall-Werten nichtnegative Zahlen eingeben."); return;
+  }
+  const beginn = document.getElementById("bBeginn").value || heute();
+  const ende = document.getElementById("bEnde").value;
+  if (ende && ende < beginn) { alert("Das Ende der Behandlung darf nicht vor dem Beginn liegen."); return; }
   volk.behandlungen.unshift({
-    beginn: document.getElementById("bBeginn").value || heute(), ende: document.getElementById("bEnde").value,
-    mittel: document.getElementById("bMittel").value, dosierung: document.getElementById("bDosierung").value,
+    beginn, ende,
+    mittel: document.getElementById("bMittel").value, art: document.getElementById("bArt").value, dosierung: document.getElementById("bDosierung").value,
+    anzahl, milbenVor, milbenWaehrend, milbenNach,
     bemerkung: document.getElementById("bBemerkung").value
   });
+  ["bMittel", "bArt", "bEnde", "bDosierung", "bAnzahl", "bMilbenVor", "bMilbenWaehrend", "bMilbenNach", "bBemerkung"].forEach(fid => { const el = document.getElementById(fid); if (el) el.value = ""; });
+  document.getElementById("bBeginn").value = heute();
   speichern(); behandlungenAnzeigen();
 }
 function behandlungenAnzeigen() {
@@ -1279,8 +1370,9 @@ function behandlungenAnzeigen() {
   const volk = daten.voelker.find(v => v.id === id);
   const tb = document.getElementById("behandlungen");
   if (!tb) return;
-  if (!volk || !volk.behandlungen.length) return tb.innerHTML = "<tr><td colspan='6'>Keine Behandlungen.</td></tr>";
-  tb.innerHTML = volk.behandlungen.map((b, i) => `<tr><td>${b.beginn}</td><td>${b.ende||"–"}</td><td>${escapeHtml(b.mittel)}</td><td>${escapeHtml(b.dosierung)}</td><td>${escapeHtml(b.bemerkung)}</td><td><button class="danger" onclick="behandlungLoeschen(${i})">✕</button></td></tr>`).join("");
+  if (!volk || !volk.behandlungen.length) return tb.innerHTML = "<tr><td colspan='11'>Keine Behandlungen.</td></tr>";
+  const wertAnzeigen = wert => wert !== undefined && wert !== null && wert !== "" ? escapeHtml(String(wert)) : "–";
+  tb.innerHTML = volk.behandlungen.map((b, i) => `<tr><td>${datumAnzeigen(b.beginn)}</td><td>${datumAnzeigen(b.ende)}</td><td>${escapeHtml(b.mittel || "–")}</td><td>${escapeHtml(b.art || "–")}</td><td>${escapeHtml(b.dosierung || "–")}</td><td>${wertAnzeigen(b.anzahl)}</td><td>${wertAnzeigen(b.milbenVor)}</td><td>${wertAnzeigen(b.milbenWaehrend)}</td><td>${wertAnzeigen(b.milbenNach)}</td><td>${escapeHtml(b.bemerkung || "–")}</td><td><button class="danger" onclick="behandlungLoeschen(${i})">✕</button></td></tr>`).join("");
 }
 function behandlungLoeschen(i) {
   const id = Number(document.getElementById("bVolk").value);
@@ -1393,7 +1485,7 @@ function vergleichAnzeigen() {
     tr.innerHTML = `
       <td><strong>${escapeHtml(volk.name)}</strong></td>
       <td>${escapeHtml(volk.standort || "–")}</td>
-      <td>${letzte ? escapeHtml(letzte.datum) : "–"}</td>
+      <td>${letzte ? escapeHtml(datumAnzeigen(letzte.datum)) : "–"}</td>
       <td>${letzte && letzte.staerke ? escapeHtml(letzte.staerke) : "–"}</td>
       <td>${letzte && letzte.futter ? escapeHtml(letzte.futter) : "–"}</td>
       <td>${letzteVarroa !== null ? letzteVarroa + " / Tag" : "–"}</td>
@@ -1425,6 +1517,7 @@ function alleAnzeigen() {
   gesamtUebersichtAnzeigen();
   herkunftGesamtTabelleAnzeigen();
   vergleichAnzeigen();
+  if (mapUebersicht) aktualisiereUebersichtKarte();
 }
 
 function exportJson() {
