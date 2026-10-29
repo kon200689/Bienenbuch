@@ -157,6 +157,9 @@
   h3 { margin-bottom: 8px; font-size: 16px; }
 
   .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+  .milbenwerte-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .milbenwerte-grid > div { min-width: 0; }
+  @media (max-width: 680px) { .milbenwerte-grid { grid-template-columns: 1fr; } }
   .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(175px, 1fr)); gap: 12px; }
 
   .kpi {
@@ -171,7 +174,7 @@
   .kpi small { color: #7a7057; font-weight: 600; text-transform: uppercase; font-size: 11px; }
 
   #mapAuswahl, #standortUebersichtKarte {
-    width: 100%; height: 320px; border-radius: 8px; border: 1px solid #b9b2a3; margin-top: 8px; z-index: 10;
+    width: 100%; height: 340px; border-radius: 8px; border: 1px solid #b9b2a3; margin-top: 8px; z-index: 10;
   }
 
   .dashboard-kopf { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; }
@@ -223,6 +226,23 @@
   dialog { max-width: 780px; width: calc(100% - 32px); border: 0; border-radius: 14px; padding: 0; }
   .dialog-inhalt { padding: 22px; }
   
+  .toolbar { display:flex; flex-wrap:wrap; gap:10px; align-items:end; margin-bottom:14px; }
+  .toolbar > div { flex:1; min-width:180px; }
+  .status-pill { display:inline-block; padding:3px 8px; border-radius:999px; font-size:12px; background:#edf5e9; color:#285b2b; }
+  .task-item { border:1px solid var(--kartenrand); border-radius:999px; border-radius:9px; padding:12px; margin:8px 0; display:flex; justify-content:space-between; gap:12px; align-items:start; }
+  .task-item.overdue { border-left:5px solid var(--rot); background:#fff5f4; }
+  .task-item.done { opacity:.65; }
+  .event-list { border-left:3px solid var(--gelb); margin:8px 0 8px 8px; padding-left:16px; }
+  .event-item { position:relative; padding:0 0 14px; }
+  .event-item:before { content:""; position:absolute; left:-22px; top:7px; width:9px; height:9px; border-radius:50%; background:var(--honig); }
+  .thumbs { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+  .thumbs a { display:block; max-width:150px; overflow-wrap:anywhere; }
+  .thumbs img { width:130px; height:90px; object-fit:cover; border-radius:8px; border:1px solid var(--kartenrand); }
+  .legende { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px; font-size: 12px; }
+  .legende span { display: inline-flex; align-items: center; gap: 5px; }
+  .legende i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; }
+
+  @media print { .no-print, button, nav, .actions { display:none !important; } body { background:#fff; } .card { box-shadow:none; break-inside:avoid; } }
   footer { max-width: 1200px; margin: 30px auto; padding: 0 18px; font-size: 11px; }
 </style>
 </head>
@@ -245,6 +265,7 @@
     <button type="button" data-reiter="herkunft" onclick="zeigeReiter('herkunft')">👑 Herkunft & Abstammung</button>
     <button type="button" data-reiter="behandlung" onclick="zeigeReiter('behandlung')">🧪 Varroa & Behandlung</button>
     <button type="button" data-reiter="fuetterung" onclick="zeigeReiter('fuetterung')">🍯 Fütterung</button>
+    <button type="button" data-reiter="management" onclick="zeigeReiter('management')">🗓️ Aufgaben & Verlauf</button>
     <button type="button" data-reiter="sync" onclick="zeigeReiter('sync')">⚙️ Sync & Cloud</button>
   </div>
   <div id="syncBadge" class="sync-badge ok">☁️ Cloud verbunden</div>
@@ -255,7 +276,10 @@
   <!-- ================= Reiter: Dashboard ================= -->
   <section id="reiter-dashboard" class="reiter">
     <section class="card">
-      <h2>📊 Gesamtübersicht</h2>
+      <div class="row" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <h2>📊 Gesamtübersicht</h2>
+        <button type="button" class="secondary" onclick="dashboardAktualisieren()">↻ Dashboard aktualisieren</button>
+      </div>
       <div class="kpi-grid" id="gesamtKpi"></div>
       <div id="gesamtHinweise"></div>
     </section>
@@ -360,6 +384,16 @@
 
     <section class="card">
       <h2>🏠 Meine Völker</h2>
+      <div class="toolbar no-print" style="margin-bottom:12px">
+        <div>
+          <label for="volkSuche">Suchfilter (Name, Beute, Herkunft)</label>
+          <input id="volkSuche" placeholder="Suchen …" oninput="listeAnzeigen()">
+        </div>
+        <div>
+          <label for="volkFilterStandort">Filter nach Standort</label>
+          <select id="volkFilterStandort" onchange="listeAnzeigen()"><option value="">Alle Standorte</option></select>
+        </div>
+      </div>
       <div id="volkListe"></div>
     </section>
 
@@ -401,8 +435,10 @@
           <div><label for="dVarroa">Varroa: Milben/Tag</label><input type="number" step="0.1" id="dVarroa"></div>
         </div>
         <div style="margin-top:12px"><label for="dBemerkung">Bemerkungen</label><textarea id="dBemerkung"></textarea></div>
+        <div style="margin-top:12px"><label for="dFotos">Foto-Links (optional, eine URL pro Zeile)</label><textarea id="dFotos" placeholder="https://…"></textarea><p class="small">Die Bilder bleiben über ihre URL verknüpft. Bitte keine privaten oder nicht freigegebenen Links verwenden.</p></div>
         <div class="actions">
-          <button class="green" onclick="durchsichtSpeichern()">Durchsicht speichern</button>
+          <button class="green" id="durchsichtSpeichernBtn" onclick="durchsichtSpeichern()">Durchsicht speichern</button>
+          <button class="secondary hidden" id="durchsichtAbbrechenBtn" onclick="durchsichtFormZuruecksetzen()">Bearbeiten abbrechen</button>
           <button class="danger" onclick="volkLoeschen()">Volk löschen</button>
         </div>
       </section>
@@ -411,7 +447,7 @@
         <h2>📚 Durchsichten</h2>
         <div style="overflow-x:auto">
           <table>
-            <thead><tr><th>Datum</th><th>Stärke</th><th>Brut</th><th>Königin</th><th>Futter</th><th>Varroa</th><th>Ampel</th><th>Bemerkung</th><th></th></tr></thead>
+            <thead><tr><th>Datum</th><th>Stärke</th><th>Brut</th><th>Königin</th><th>Futter</th><th>Varroa</th><th>Ampel</th><th>Bemerkung</th><th>Bearbeiten</th><th></th></tr></thead>
             <tbody id="durchsichten"></tbody>
           </table>
         </div>
@@ -431,9 +467,11 @@
         <h2 id="herkunftTitelForm">👑 Herkunft & Zuchtdaten</h2>
         <div class="grid">
           <div><label for="hMuttervolk">Muttervolk / Abstammung</label><input id="hMuttervolk"></div>
-          <div><label for="hRasse">Rasse / Linie</label><input id="hRasse" placeholder="Carnica, Buckfast..."></div>
+          <div><label for="hRasse">Rasse / Linie</label><input id="hRasse" list="hRasseListe" placeholder="Carnica, Buckfast...">
+            <datalist id="hRasseListe"><option value="Carnica"></option><option value="Buckfast"></option><option value="Ligustica (Italienische Biene)"></option><option value="Mellifera (Dunkle Biene)"></option><option value="Kärntner Biene"></option><option value="Kreuzung / Hybrid"></option><option value="Unbekannt"></option></datalist></div>
           <div><label for="hSchlupfdatum">Schlupfdatum</label><input type="date" id="hSchlupfdatum"></div>
-          <div><label for="hBegattungsart">Begattungsart</label><input id="hBegattungsart" placeholder="Standbegattet, Belegstelle..."></div>
+          <div><label for="hBegattungsart">Begattungsart</label><input id="hBegattungsart" list="hBegattungsartListe" placeholder="Standbegattet, Belegstelle...">
+            <datalist id="hBegattungsartListe"><option value="Standbegattet"></option><option value="Belegstelle"></option><option value="Inselbelegstelle"></option><option value="Instrumentelle Besamung"></option><option value="Unbekannt"></option></datalist></div>
           <div><label for="hBelegstelle">Belegstelle Name</label><input id="hBelegstelle"></div>
           <div><label for="hZuechter">Züchter / Herkunft</label><input id="hZuechter"></div>
         </div>
@@ -464,10 +502,17 @@
       <section class="card">
         <h2>➕ Behandlung eintragen</h2>
         <div class="grid">
-          <div><label for="bMittel">Behandlungsmittel</label><input id="bMittel" placeholder="Ameisensäure, Oxalsäure..."></div>
+          <div><label for="bMittel">Behandlungsmittel (freie Eingabe)</label><input id="bMittel" list="bMittelListe" placeholder="Ameisensäure, Oxalsäure, Thymol …"><datalist id="bMittelListe"><option value="Ameisensäure"></option><option value="Oxalsäure"></option><option value="Thymol"></option><option value="Milchsäure"></option><option value="Bio-technisch (kein Mittel)"></option></datalist></div>
+          <div><label for="bArt">Behandlungsart</label><select id="bArt"><option value="">– bitte wählen –</option><option>Verdunster (Langzeit)</option><option>Verdunster / Vergaser (Kurzzeit)</option><option>Träufelung</option><option>Sublimation / Vernebelung</option><option>Sprühverfahren</option><option>Bio-technisch (z. B. Drohnenrahmen, Brutentnahme)</option><option>Sonstiges</option></select></div>
           <div><label for="bBeginn">Beginn</label><input type="date" id="bBeginn"></div>
           <div><label for="bEnde">Ende</label><input type="date" id="bEnde"></div>
-          <div><label for="bDosierung">Dosierung</label><input id="bDosierung"></div>
+          <div><label for="bDosierung">Dosierung</label><input id="bDosierung" placeholder="z. B. 1 Verdunster, 5 ml pro Wabengasse"></div>
+          <div><label for="bAnzahl">Anzahl der Applikationen</label><input type="number" step="1" min="0" id="bAnzahl" placeholder="z. B. 3"></div>
+        </div>
+        <div class="milbenwerte-grid" style="margin-top:12px">
+          <div><label for="bMilbenVor">Milbenfall VOR der Behandlung (Milben/Tag)</label><input type="number" step="0.1" min="0" id="bMilbenVor" placeholder="z. B. 8"></div>
+          <div><label for="bMilbenWaehrend">Milbenfall WÄHREND der Behandlung (Milben/Tag)</label><input type="number" step="0.1" min="0" id="bMilbenWaehrend" placeholder="z. B. 20"></div>
+          <div><label for="bMilbenNach">Milbenfall NACH der Behandlung (Milben/Tag)</label><input type="number" step="0.1" min="0" id="bMilbenNach" placeholder="z. B. 1"></div>
         </div>
         <div style="margin-top:12px"><label for="bBemerkung">Bemerkungen</label><textarea id="bBemerkung"></textarea></div>
         <div class="actions"><button class="green" onclick="behandlungSpeichern()">Behandlung speichern</button></div>
@@ -477,7 +522,7 @@
         <h2>Behandlungen</h2>
         <div style="overflow-x:auto">
           <table>
-            <thead><tr><th>Beginn</th><th>Ende</th><th>Mittel</th><th>Dosierung</th><th>Bemerkung</th><th></th></tr></thead>
+            <thead><tr><th>Beginn</th><th>Ende</th><th>Mittel</th><th>Art</th><th>Dosierung</th><th>Applikationen</th><th>Milben/Tag vor</th><th>Milben/Tag während</th><th>Milben/Tag nach</th><th>Bemerkung</th><th></th></tr></thead>
             <tbody id="behandlungen"></tbody>
           </table>
         </div>
@@ -513,6 +558,74 @@
           </table>
         </div>
       </section>
+    </section>
+  </section>
+
+  <!-- ================= Reiter: Aufgaben, Verlauf & Wirtschaftlichkeit ================= -->
+  <section id="reiter-management" class="reiter hidden">
+    <section class="card">
+      <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap"><h2>🗓️ Aufgaben & anstehende Kontrollen</h2><button class="secondary" onclick="managementAnzeigen()">↻ Aktualisieren</button></div>
+      <p class="small">Automatische Hinweise sind Planungshilfen und ersetzen keine fachliche Beurteilung des Volkes.</p>
+      <div id="autoHinweise"></div>
+      <h3>Eigene Aufgabe / Erinnerung</h3>
+      <div class="grid">
+        <div><label for="aVolk">Volk</label><select id="aVolk"></select></div>
+        <div><label for="aFaellig">Fällig am</label><input type="date" id="aFaellig"></div>
+        <div><label for="aTitel">Aufgabe</label><input id="aTitel" placeholder="z. B. Futtervorrat kontrollieren"></div>
+        <div><label for="aPrioritaet">Priorität</label><select id="aPrioritaet"><option>Normal</option><option>Hoch</option><option>Niedrig</option></select></div>
+      </div>
+      <div class="actions"><button class="green" onclick="aufgabeSpeichern()">Aufgabe hinzufügen</button></div>
+      <div id="aufgabenListe"></div>
+    </section>
+
+    <section class="card">
+      <h2>📈 Gewichtskontrolle</h2>
+      <div class="grid">
+        <div><label for="gVolk">Volk</label><select id="gVolk" onchange="zeichneGewichtsDiagramm()"></select></div>
+        <div><label for="gDatum">Datum</label><input type="date" id="gDatum"></div>
+        <div><label for="gGewicht">Gesamtgewicht (kg)</label><input type="number" step="0.1" min="0" id="gGewicht"></div>
+        <div><label for="gBemerkung">Bemerkung</label><input id="gBemerkung" placeholder="z. B. nach Fütterung"></div>
+      </div>
+      <div class="actions"><button class="green" onclick="gewichtSpeichern()">Gewicht speichern</button></div>
+      <h3>Gewichtsverlauf des ausgewählten Volkes</h3><div class="chart-box"><canvas id="gewichtChart"></canvas></div>
+      <div style="overflow-x:auto"><table><thead><tr><th>Datum</th><th>Volk</th><th>Gewicht</th><th>Bemerkung</th><th></th></tr></thead><tbody id="gewichtsTabelle"></tbody></table></div>
+    </section>
+
+    <section class="card">
+      <h2>🍯 Honigernte, Chargen & Kosten</h2>
+      <div class="grid">
+        <div><label for="eVolk">Volk / Stand</label><select id="eVolk"></select></div>
+        <div><label for="eDatum">Erntedatum</label><input type="date" id="eDatum"></div>
+        <div><label for="eSorte">Honigsorte / Charge</label><input id="eSorte" placeholder="z. B. Frühtracht 2026"></div>
+        <div><label for="eMenge">Erntemenge (kg)</label><input type="number" min="0" step="0.1" id="eMenge"></div>
+        <div><label for="eKosten">Kosten (€)</label><input type="number" min="0" step="0.01" id="eKosten"></div>
+        <div><label for="eBemerkung">Bemerkung</label><input id="eBemerkung"></div>
+      </div>
+      <div class="actions"><button class="green" onclick="ernteSpeichern()">Ernte / Kosten speichern</button></div>
+      <div id="ernteSummen" class="kpi-grid"></div>
+      <div style="overflow-x:auto"><table><thead><tr><th>Datum</th><th>Volk</th><th>Sorte / Charge</th><th>Menge (kg)</th><th>Kosten (€)</th><th>Bemerkung</th><th></th></tr></thead><tbody id="ernteTabelle"></tbody></table></div>
+    </section>
+
+    <section class="card">
+      <h2>👑 Königinnenhistorie</h2>
+      <div class="grid">
+        <div><label for="qVolk">Volk</label><select id="qVolk"></select></div>
+        <div><label for="qDatum">Datum</label><input type="date" id="qDatum"></div>
+        <div><label for="qEreignis">Ereignis</label><select id="qEreignis"><option>Neue Königin eingesetzt</option><option>Königin gesehen</option><option>Umweiselung</option><option>Nachschaffungszellen</option><option>Weisellosigkeit festgestellt</option><option>Begattung / Belegstelle</option></select></div>
+        <div><label for="qInfo">Kennzeichnung / Herkunft</label><input id="qInfo" placeholder="z. B. Grün 2026, Linie …"></div>
+      </div>
+      <div style="margin-top:10px"><label for="qBemerkung">Notizen</label><textarea id="qBemerkung"></textarea></div>
+      <div class="actions"><button class="green" onclick="koeniginEreignisSpeichern()">Ereignis speichern</button></div>
+      <div style="overflow-x:auto"><table><thead><tr><th>Datum</th><th>Volk</th><th>Ereignis</th><th>Kennzeichnung / Herkunft</th><th>Notizen</th><th></th></tr></thead><tbody id="koeniginTabelle"></tbody></table></div>
+    </section>
+
+    <section class="card">
+      <h2>🧾 Jahresverlauf & Datenexport</h2>
+      <p>Der Verlauf fasst Durchsichten, Behandlungen, Fütterungen, Gewichtsmessungen, Königinnenereignisse und Ernten chronologisch zusammen.</p>
+      <div class="toolbar"><div><label for="timelineVolk">Volk für Zeitleiste</label><select id="timelineVolk" onchange="zeitleisteAnzeigen()"><option value="">Alle Völker</option></select></div><div><label for="timelineJahr">Jahr</label><select id="timelineJahr" onchange="zeitleisteAnzeigen()"><option value="">Alle Jahre</option></select></div></div>
+      <div id="zeitleiste" class="event-list"></div>
+      <div class="actions no-print"><button class="secondary" onclick="exportCsv()">CSV-Übersicht herunterladen</button><button class="secondary" onclick="window.print()">Drucken / als PDF speichern</button><button class="secondary" onclick="exportJson()">Vollständiges JSON-Backup</button></div>
+      <p class="small">Für PDF im Druckdialog „Als PDF speichern“ auswählen. Fotos werden als verknüpfte URLs angezeigt; die CSV enthält strukturierte Kerndaten.</p>
     </section>
   </section>
 
@@ -562,14 +675,14 @@
   const db = getDatabase(app);
   const datenRef = ref(db, 'stockkarte_daten');
 
-  window.daten = { voelker: [], standorte: [] };
+  window.daten = { voelker: [], standorte: [], aufgaben: [], gewichte: [], ernten: [], koeniginnenEreignisse: [] };
 
   onValue(datenRef, (snapshot) => {
     const cloudDaten = snapshot.val();
     if (cloudDaten) {
       window.daten = cloudDaten;
     } else {
-      window.daten = { voelker: [], standorte: [] };
+      window.daten = { voelker: [], standorte: [], aufgaben: [], gewichte: [], ernten: [], koeniginnenEreignisse: [] };
     }
     window.datenstrukturAbsichern();
     window.alleAnzeigen();
@@ -596,7 +709,7 @@
 <script>
 /* ---------- Passwort-Schutz direkt am Anfang ---------- */
 function passwortPruefen() {
-  const geheimPW = "bienen2026"; // Hier kannst du dein Passwort anpassen
+  const geheimPW = "bienen2026";
   const eingabe = prompt("Bitte gib das Passwort für deine Stockkarte ein:");
   if (eingabe !== geheimPW) {
     alert("Falsches Passwort! Zugriff verweigert.");
@@ -605,20 +718,27 @@ function passwortPruefen() {
   }
 }
 
-// Passwort sofort beim Laden der Seite ausführen:
+// Passwort sofort ausführen:
 passwortPruefen();
 
 let aktivesVolk = null;
 let aktuellerReiter = "dashboard";
+let bearbeiteDurchsichtIndex = null;
 let bearbeiteStandortId = null;
 
 function datenstrukturAbsichern() {
   if (!Array.isArray(daten.standorte)) daten.standorte = [];
   if (!Array.isArray(daten.voelker)) daten.voelker = [];
+  if (!Array.isArray(daten.aufgaben)) daten.aufgaben = [];
+  if (!Array.isArray(daten.gewichte)) daten.gewichte = [];
+  if (!Array.isArray(daten.ernten)) daten.ernten = [];
+  if (!Array.isArray(daten.koeniginnenEreignisse)) daten.koeniginnenEreignisse = [];
   daten.voelker.forEach(volk => {
     if (!Array.isArray(volk.durchsichten)) volk.durchsichten = [];
     if (!Array.isArray(volk.behandlungen)) volk.behandlungen = [];
     if (!Array.isArray(volk.fuetterungen)) volk.fuetterungen = [];
+    if (!Array.isArray(volk.gewichte)) volk.gewichte = [];
+    if (!Array.isArray(volk.ernten)) volk.ernten = [];
     if (!volk.herkunft) volk.herkunft = {};
   });
 }
@@ -636,11 +756,24 @@ function zeigeReiter(name) {
   if (name === "dashboard") { vergleichAnzeigen(); gesamtUebersichtAnzeigen(); }
   else if (name === "standorte") { standorteAnzeigen(); initMapAuswahl(); initMapUebersicht(); }
   else if (name === "herkunft") { aktualisiereVolkAuswahl(); herkunftGesamtTabelleAnzeigen(); }
+  else if (name === "management") { managementAuswahlAktualisieren(); managementAnzeigen(); }
 }
 
-function heute() { return new Date().toISOString().slice(0, 10); }
+function heute() { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+function datumAnzeigen(datum) {
+  if (!datum) return "–";
+  const teile = String(datum).slice(0, 10).split("-");
+  return teile.length === 3 ? `${teile[2]}.${teile[1]}.${teile[0]}` : String(datum);
+}
 
-/* ---------- Standorte (mit Layer-Steuerung & Bearbeitung) ---------- */
+function dashboardAktualisieren() {
+  datenstrukturAbsichern();
+  gesamtUebersichtAnzeigen();
+  vergleichAnzeigen();
+  if (typeof initMapUebersicht === "function") initMapUebersicht();
+}
+
+/* ---------- Standorte (mit Karten-Layer-Steuerung & Bearbeiten) ---------- */
 let mapAuswahl = null, markerAuswahl = null, mapUebersicht = null, uebersichtMarkerEbene = null;
 
 function erstelleKartenLayers() {
@@ -705,7 +838,6 @@ function initMapUebersicht() {
       });
 
       L.control.layers(layers.baseLayers).addTo(mapUebersicht);
-
       uebersichtMarkerEbene = L.layerGroup().addTo(mapUebersicht);
     }
     mapUebersicht.invalidateSize();
@@ -722,12 +854,14 @@ function aktualisiereUebersichtKarte() {
       const latLng = [Number(st.lat), Number(st.lng)];
       bounds.push(latLng);
       const anzahlVoelker = daten.voelker.filter(v => v.standort === st.name).length;
-      L.marker(latLng).bindPopup(`<b>${escapeHtml(st.name)}</b><br>${anzahlVoelker} Volk/Völker`).addTo(uebersichtMarkerEbene);
+      L.marker(latLng).bindPopup(`<b>${escapeHtml(st.name)}</b><br>${anzahlVoelker} Volk/Völker zugeordnet`).addTo(uebersichtMarkerEbene);
     }
   });
-  if (mapUebersicht && bounds.length > 0) {
-    if (bounds.length === 1) mapUebersicht.setView(bounds[0], 13);
-    else mapUebersicht.fitBounds(bounds, { padding: [30, 30] });
+  if (mapUebersicht) {
+    mapUebersicht.invalidateSize();
+    if (bounds.length > 1) mapUebersicht.fitBounds(bounds, { padding: [30, 30], maxZoom: 14 });
+    else if (bounds.length === 1) mapUebersicht.setView(bounds[0], 13);
+    else mapUebersicht.setView([51.1657, 10.4515], 6);
   }
 }
 
@@ -739,7 +873,6 @@ function standortSpeichern() {
   if (!name) return alert("Bitte Standort-Namen eingeben.");
 
   if (bearbeiteStandortId !== null) {
-    // Bearbeiten eines bestehenden Standorts
     const alterStandort = daten.standorte.find(s => s.id === bearbeiteStandortId);
     if (alterStandort) {
       const alterName = alterStandort.name;
@@ -747,7 +880,6 @@ function standortSpeichern() {
       alterStandort.lat = lat;
       alterStandort.lng = lng;
 
-      // Auch bei zugewiesenen Völkern den Namen aktualisieren, falls er geändert wurde
       if (alterName !== name) {
         daten.voelker.forEach(v => {
           if (v.standort === alterName) v.standort = name;
@@ -755,7 +887,6 @@ function standortSpeichern() {
       }
     }
   } else {
-    // Neuen Standort anlegen
     daten.standorte.push({ id: Date.now(), name, lat, lng });
   }
 
@@ -777,7 +908,6 @@ function standortBearbeiten(id) {
   document.getElementById("sSpeichernBtn").textContent = "Standort aktualisieren";
   document.getElementById("sAbbrechenBtn").classList.remove("hidden");
 
-  // Auf Karte zentrieren & Marker setzen
   if (mapAuswahl && st.lat && st.lng) {
     const pos = [Number(st.lat), Number(st.lng)];
     mapAuswahl.setView(pos, 13);
@@ -785,7 +915,6 @@ function standortBearbeiten(id) {
     else markerAuswahl = L.marker(pos).addTo(mapAuswahl);
   }
 
-  // Sanftes Scrollen zum Formular
   document.getElementById("standortFormTitel").scrollIntoView({ behavior: 'smooth' });
 }
 
@@ -853,8 +982,19 @@ function volkSpeichern() {
 
 function listeAnzeigen() {
   const l = document.getElementById("volkListe");
+  if (!l) return;
   if (!daten.voelker.length) return l.innerHTML = "<p>Noch keine Völker.</p>";
-  l.innerHTML = daten.voelker.map(v => `
+  const suchfeld = document.getElementById('volkSuche');
+  const filterfeld = document.getElementById('volkFilterStandort');
+  const q = (suchfeld?.value || '').trim().toLocaleLowerCase('de');
+  const standort = filterfeld?.value || '';
+  const gefiltert = daten.voelker.filter(v => {
+    const h = v.herkunft || {};
+    const text = [v.name, v.standort, v.beute, v.koenigin, h.rasse, h.muttervolk].join(' ').toLocaleLowerCase('de');
+    return (!q || text.includes(q)) && (!standort || v.standort === standort);
+  });
+  if (!gefiltert.length) return l.innerHTML = '<p>Keine passenden Völker gefunden.</p>';
+  l.innerHTML = gefiltert.map(v => `
     <div class="volk-card-item">
       <button class="volk-btn ${aktivesVolk === v.id ? 'active' : ''}" onclick="volkOeffnen(${v.id})">
         <strong>${escapeHtml(v.name)}</strong>
@@ -893,58 +1033,406 @@ function gesamtUebersichtAnzeigen() {
     kpi.innerHTML = `
       <div class="kpi"><small>Völker</small><strong>${daten.voelker.length}</strong></div>
       <div class="kpi"><small>Standorte</small><strong>${daten.standorte.length}</strong></div>
+      <div class="kpi"><small>Offene Aufgaben</small><strong>${(daten.aufgaben||[]).filter(a=>!a.erledigt).length}</strong></div>
+      <div class="kpi"><small>Erfasste Ernten</small><strong>${(daten.ernten||[]).reduce((n,e)=>n+(Number(e.menge)||0),0).toFixed(1)} kg</strong></div>
     `;
   }
+  const hints=document.getElementById('gesamtHinweise');
+  if(hints){
+    const offen=(daten.aufgaben||[]).filter(a=>!a.erledigt);
+    hints.innerHTML=offen.length?`<div class="hinweis"><strong>${offen.length} offene Aufgabe(n)</strong> · <button class="secondary" onclick="zeigeReiter('management')">Aufgaben öffnen</button></div>`:'';
+  }
+}
+
+/* ---------- Varroa & Diagramme ---------- */
+function varroaBewertung(datum, wert) {
+  if (!datum || wert === "" || wert === null || isNaN(parseFloat(wert))) {
+    return {
+      stufe: "Keine Daten",
+      farbe: "#6a6455",
+      hintergrund: "#f5f3f0",
+      richtwert: "–",
+      bereich: "–",
+      text: "Kein gültiger Varroawert erfasst."
+    };
+  }
+
+  const wertZahl = parseFloat(wert);
+  const monat = new Date(datum + "T00:00:00").getMonth();
+
+  if (monat >= 2 && monat <= 4) {
+    const bereich = "Frühjahr, März–Mai";
+    const richtwert = "ab 5 Milben/Tag";
+    if (wertZahl < 1) return erstelleBewertung("Grün", "#2e7d32", "#e8f5e9", richtwert, bereich);
+    if (wertZahl < 5) return erstelleBewertung("Gelb", "#c77700", "#fff8e1", richtwert, bereich);
+    return erstelleBewertung("Rot", "#b3261e", "#ffebee", richtwert, bereich);
+  }
+
+  if (monat >= 5 && monat <= 6) {
+    const bereich = "Sommer, Juni–Juli";
+    const richtwert = "ab 10 Milben/Tag";
+    if (wertZahl < 3) return erstelleBewertung("Grün", "#2e7d32", "#e8f5e9", richtwert, bereich);
+    if (wertZahl < 10) return erstelleBewertung("Gelb", "#c77700", "#fff8e1", richtwert, bereich);
+    return erstelleBewertung("Rot", "#b3261e", "#ffebee", richtwert, bereich);
+  }
+
+  if (monat >= 7 && monat <= 8) {
+    const bereich = "Spätsommer, August–September";
+    const richtwert = "ab 5 Milben/Tag";
+    if (wertZahl < 2) return erstelleBewertung("Grün", "#2e7d32", "#e8f5e9", richtwert, bereich);
+    if (wertZahl < 5) return erstelleBewertung("Gelb", "#c77700", "#fff8e1", richtwert, bereich);
+    return erstelleBewertung("Rot", "#b3261e", "#ffebee", richtwert, bereich);
+  }
+
+  const bereich = "Herbst/Winter, Oktober–Februar";
+  const richtwert = "ab 1 Milbe/Tag";
+  if (wertZahl < 0.5) return erstelleBewertung("Grün", "#2e7d32", "#e8f5e9", richtwert, bereich);
+  if (wertZahl < 1) return erstelleBewertung("Gelb", "#c77700", "#fff8e1", richtwert, bereich);
+  return erstelleBewertung("Rot", "#b3261e", "#ffebee", richtwert, bereich);
+
+  function erstelleBewertung(stufe, farbe, hintergrund, richtwert, bereich) {
+    return { stufe, farbe, hintergrund, richtwert, bereich, text: stufe + " für " + bereich + " · Richtwert: " + richtwert };
+  }
+}
+
+function holePunkte(durchsichten) {
+  return durchsichten
+    .filter(d => d.varroa !== "" && d.varroa !== null && !isNaN(parseFloat(d.varroa)))
+    .map(d => ({ datum: d.datum, wert: parseFloat(d.varroa) }))
+    .sort((a, b) => a.datum.localeCompare(b.datum));
+}
+
+function canvasVorbereiten(canvas) {
+  const ctx = canvas.getContext("2d");
+  const box = canvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+
+  canvas.width = box.width * dpr;
+  canvas.height = box.height * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  const w = box.width;
+  const h = box.height;
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, w, h);
+
+  return { ctx, w, h };
+}
+
+function zeichneDatumsAchse(ctx, datumsListe, xPos, w, h, randUnten) {
+  ctx.fillStyle = "#7a7057";
+  ctx.font = "10px system-ui, Arial";
+  ctx.textAlign = "center";
+
+  const n = datumsListe.length;
+  if (!n) return;
+
+  const labels = datumsListe.map(d => formatDatumKurz(d));
+  const halbe = labels.map(t => ctx.measureText(t).width / 2);
+  const abstand = 10;
+  const indizes = [0];
+
+  for (let i = 1; i < n - 1; i++) {
+    const x = xPos(datumsListe[i]);
+    const letzter = indizes[indizes.length - 1];
+    const xLetzter = xPos(datumsListe[letzter]);
+    if (x - halbe[i] - (xLetzter + halbe[letzter]) >= abstand) {
+      indizes.push(i);
+    }
+  }
+
+  if (n > 1) {
+    const letzter = indizes[indizes.length - 1];
+    const xLetzter = xPos(datumsListe[letzter]);
+    const xEnde = xPos(datumsListe[n - 1]);
+
+    if (xEnde - halbe[n - 1] - (xLetzter + halbe[letzter]) >= abstand) {
+      indizes.push(n - 1);
+    } else {
+      indizes.pop();
+      indizes.push(n - 1);
+    }
+  }
+
+  indizes.forEach(index => {
+    const x = xPos(datumsListe[index]);
+    ctx.fillText(labels[index], x, h - randUnten + 18);
+  });
+}
+
+function zeichneVarroaDiagramm(durchsichten) {
+  const canvas = document.getElementById("varroaChart");
+  if (!canvas) return;
+  const punkte = holePunkte(durchsichten || []);
+  const { ctx, w, h } = canvasVorbereiten(canvas);
+
+  if (!punkte.length) {
+    ctx.fillStyle = "#7a7057";
+    ctx.font = "14px system-ui, Arial";
+    ctx.textAlign = "center";
+    ctx.fillText("Noch keine Varroa-Werte erfasst.", w / 2, h / 2);
+    return;
+  }
+
+  const maxWert = Math.max(...punkte.map(p => p.wert));
+  const yMax = Math.max(2, Math.ceil((maxWert + 1) / 2) * 2);
+
+  const randLinks = 50, randRechts = 20, randOben = 20, randUnten = 45;
+  const plotBreite = w - randLinks - randRechts;
+  const plotHoehe = h - randOben - randUnten;
+
+  function xPos(index) {
+    return punkte.length === 1 ? randLinks + plotBreite / 2 : randLinks + (index / (punkte.length - 1)) * plotBreite;
+  }
+  function yPos(wert) {
+    return randOben + plotHoehe - (wert / yMax) * plotHoehe;
+  }
+
+  ctx.strokeStyle = "#e6e0d0";
+  ctx.fillStyle = "#7a7057";
+  ctx.font = "11px system-ui, Arial";
+  ctx.textAlign = "right";
+
+  for (let wert = 0; wert <= yMax; wert += 2) {
+    const y = yPos(wert);
+    ctx.beginPath();
+    ctx.moveTo(randLinks, y);
+    ctx.lineTo(w - randRechts, y);
+    ctx.stroke();
+    ctx.fillText(wert, randLinks - 8, y + 4);
+  }
+
+  ctx.strokeStyle = "#1f6f8b";
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+
+  punkte.forEach((punkt, index) => {
+    const x = xPos(index);
+    const y = yPos(punkt.wert);
+    if (index === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  punkte.forEach((punkt, index) => {
+    const x = xPos(index);
+    const y = yPos(punkt.wert);
+    const bewertung = varroaBewertung(punkt.datum, punkt.wert);
+
+    ctx.beginPath();
+    ctx.arc(x, y, 6, 0, Math.PI * 2);
+    ctx.fillStyle = bewertung.farbe;
+    ctx.fill();
+
+    ctx.fillStyle = "#2d2a23";
+    ctx.font = "bold 11px system-ui, Arial";
+    ctx.textAlign = "center";
+    ctx.fillText(punkt.wert, x, y - 12);
+  });
+
+  zeichneDatumsAchse(ctx, punkte.map(p => p.datum), d => xPos(punkte.findIndex(p => p.datum === d)), w, h, randUnten);
+}
+
+function zeichneVergleichsDiagramm() {
+  const canvas = document.getElementById("vergleichChart");
+  if (!canvas) return;
+
+  const farben = ["#1f6f8b", "#b3261e", "#2e7d32", "#c77700", "#6a4c93", "#00838f", "#8d6e63", "#5d4037"];
+  const reihen = daten.voelker
+    .map((volk, index) => ({
+      name: volk.name,
+      punkte: holePunkte(volk.durchsichten),
+      farbe: farben[index % farben.length]
+    }))
+    .filter(reihe => reihe.punkte.length > 0);
+
+  const { ctx, w, h } = canvasVorbereiten(canvas);
+  const legende = document.getElementById("vergleichLegende");
+  legende.replaceChildren();
+
+  if (!reihen.length) {
+    ctx.fillStyle = "#7a7057";
+    ctx.font = "14px system-ui, Arial";
+    ctx.textAlign = "center";
+    ctx.fillText("Noch keine Varroa-Werte erfasst.", w / 2, h / 2);
+    return;
+  }
+
+  const allePunkte = reihen.flatMap(reihe => reihe.punkte);
+  const datumsListe = [...new Set(allePunkte.map(punkt => punkt.datum))].sort();
+  const maxWert = Math.max(...allePunkte.map(punkt => punkt.wert));
+  const yMax = Math.max(2, Math.ceil((maxWert + 1) / 2) * 2);
+
+  const randLinks = 55, randRechts = 20, randOben = 25, randUnten = 45;
+  const plotBreite = w - randLinks - randRechts;
+  const plotHoehe = h - randOben - randUnten;
+
+  function xPos(datum) {
+    return datumsListe.length === 1 ? randLinks + plotBreite / 2 : randLinks + (datumsListe.indexOf(datum) / (datumsListe.length - 1)) * plotBreite;
+  }
+  function yPos(wert) {
+    return randOben + plotHoehe - (wert / yMax) * plotHoehe;
+  }
+
+  ctx.strokeStyle = "#e6e0d0";
+  ctx.fillStyle = "#7a7057";
+  ctx.font = "11px system-ui, Arial";
+  ctx.textAlign = "right";
+
+  for (let wert = 0; wert <= yMax; wert += 2) {
+    const y = yPos(wert);
+    ctx.beginPath();
+    ctx.moveTo(randLinks, y);
+    ctx.lineTo(w - randRechts, y);
+    ctx.stroke();
+    ctx.fillText(wert, randLinks - 8, y + 4);
+  }
+
+  reihen.forEach(reihe => {
+    ctx.strokeStyle = reihe.farbe;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+
+    reihe.punkte.forEach((punkt, index) => {
+      const x = xPos(punkt.datum);
+      const y = yPos(punkt.wert);
+      if (index === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+
+    reihe.punkte.forEach(punkt => {
+      const x = xPos(punkt.datum);
+      const y = yPos(punkt.wert);
+      const bewertung = varroaBewertung(punkt.datum, punkt.wert);
+
+      ctx.beginPath();
+      ctx.arc(x, y, 5, 0, Math.PI * 2);
+      ctx.fillStyle = bewertung.farbe;
+      ctx.fill();
+    });
+  });
+
+  zeichneDatumsAchse(ctx, datumsListe, xPos, w, h, randUnten);
+
+  reihen.forEach(reihe => {
+    const span = document.createElement("span");
+    const swatch = document.createElement("i");
+    swatch.style.background = reihe.farbe;
+    span.appendChild(swatch);
+    span.appendChild(document.createTextNode(reihe.name));
+    legende.appendChild(span);
+  });
+}
+
+function formatDatumKurz(datum) {
+  if (!datum) return "";
+  const d = new Date(datum + "T00:00:00");
+  return d.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "2-digit" });
 }
 
 function dashboardAnzeigen() {
-  const volk = daten.voelker.find(v => v.id === aktivesVolk);
+  const volk = daten.voelker.find(v => String(v.id) === String(aktivesVolk));
   if (!volk) return;
+  if (!Array.isArray(volk.durchsichten)) volk.durchsichten = [];
+
   const kpi = document.getElementById("kpiBereich");
   if (kpi) {
+    const punkte = holePunkte(volk.durchsichten);
+    const letzter = punkte.length ? punkte[punkte.length - 1].wert : null;
+    const maximum = punkte.length ? Math.max(...punkte.map(p => p.wert)) : null;
+    const durchschnitt = punkte.length ? (punkte.reduce((sum, p) => sum + p.wert, 0) / punkte.length).toFixed(1) : null;
     kpi.innerHTML = `
       <div class="kpi"><small>Durchsichten</small><strong>${volk.durchsichten.length}</strong></div>
+      <div class="kpi"><small>Letzte Varroa-Messung</small><strong>${letzter !== null ? letzter + " / Tag" : "–"}</strong></div>
+      <div class="kpi"><small>Höchster Varroa-Wert</small><strong>${maximum !== null ? maximum + " / Tag" : "–"}</strong></div>
+      <div class="kpi"><small>Durchschnitt Varroa</small><strong>${durchschnitt !== null ? durchschnitt + " / Tag" : "–"}</strong></div>
     `;
   }
+  zeichneVarroaDiagramm(volk.durchsichten);
 }
 
 /* ---------- Durchsichten ---------- */
+function durchsichtFormZuruecksetzen() {
+  bearbeiteDurchsichtIndex = null;
+  const button = document.getElementById('durchsichtSpeichernBtn');
+  if (button) button.textContent = 'Durchsicht speichern';
+  const abbrechen = document.getElementById('durchsichtAbbrechenBtn');
+  if (abbrechen) abbrechen.classList.add('hidden');
+  ['dWetter','dVarroa','dBemerkung','dFotos'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  ['dStaerke','dBrut','dKoenigin','dFutter'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  const datum = document.getElementById('dDatum'); if (datum) datum.value = heute();
+}
+
 function durchsichtSpeichern() {
-  const volk = daten.voelker.find(v => v.id === aktivesVolk);
+  const volk = daten.voelker.find(v => String(v.id) === String(aktivesVolk));
   if (!volk) return;
-  volk.durchsichten.unshift({
-    datum: document.getElementById("dDatum").value || heute(),
-    wetter: document.getElementById("dWetter").value,
-    staerke: document.getElementById("dStaerke").value,
-    brut: document.getElementById("dBrut").value,
-    koenigin: document.getElementById("dKoenigin").value,
-    futter: document.getElementById("dFutter").value,
-    varroa: document.getElementById("dVarroa").value,
-    bemerkung: document.getElementById("dBemerkung").value
-  });
+  if (!Array.isArray(volk.durchsichten)) volk.durchsichten = [];
+  const eintrag = {
+    datum: document.getElementById('dDatum').value || heute(),
+    wetter: document.getElementById('dWetter').value,
+    staerke: document.getElementById('dStaerke').value,
+    brut: document.getElementById('dBrut').value,
+    koenigin: document.getElementById('dKoenigin').value,
+    futter: document.getElementById('dFutter').value,
+    varroa: document.getElementById('dVarroa').value,
+    bemerkung: document.getElementById('dBemerkung').value,
+    fotos: (document.getElementById('dFotos').value || '').split('\n').map(x => x.trim()).filter(Boolean)
+  };
+  if (bearbeiteDurchsichtIndex !== null) volk.durchsichten[bearbeiteDurchsichtIndex] = eintrag;
+  else volk.durchsichten.unshift(eintrag);
   speichern();
-  dashboardAnzeigen();
-  durchsichtenAnzeigen();
+  durchsichtFormZuruecksetzen();
+  dashboardAnzeigen(); durchsichtenAnzeigen(); vergleichAnzeigen(); gesamtUebersichtAnzeigen();
+}
+
+function durchsichtBearbeiten(index) {
+  const volk = daten.voelker.find(v => String(v.id) === String(aktivesVolk));
+  const d = volk?.durchsichten?.[index];
+  if (!d) return;
+  bearbeiteDurchsichtIndex = index;
+  document.getElementById('dDatum').value = d.datum || heute();
+  document.getElementById('dWetter').value = d.wetter || '';
+  document.getElementById('dStaerke').value = d.staerke || '';
+  document.getElementById('dBrut').value = d.brut || '';
+  document.getElementById('dKoenigin').value = d.koenigin || '';
+  document.getElementById('dFutter').value = d.futter || '';
+  document.getElementById('dVarroa').value = d.varroa ?? '';
+  document.getElementById('dBemerkung').value = d.bemerkung || '';
+  document.getElementById('dFotos').value = Array.isArray(d.fotos) ? d.fotos.join('\n') : '';
+  document.getElementById('durchsichtSpeichernBtn').textContent = 'Änderungen speichern';
+  document.getElementById('durchsichtAbbrechenBtn').classList.remove('hidden');
+  document.getElementById('dDatum').scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 function durchsichtenAnzeigen() {
-  const volk = daten.voelker.find(v => v.id === aktivesVolk);
-  const tb = document.getElementById("durchsichten");
+  const volk = daten.voelker.find(v => String(v.id) === String(aktivesVolk));
+  const tb = document.getElementById('durchsichten');
   if (!tb) return;
-  if (!volk || !volk.durchsichten.length) return tb.innerHTML = "<tr><td colspan='9'>Keine Durchsichten.</td></tr>";
-  tb.innerHTML = volk.durchsichten.map((d, i) => `
-    <tr>
-      <td>${d.datum}</td><td>${escapeHtml(d.staerke)}</td><td>${escapeHtml(d.brut)}</td>
-      <td>${escapeHtml(d.koenigin)}</td><td>${escapeHtml(d.futter)}</td><td>${d.varroa || "–"}</td>
-      <td>🟢</td><td>${escapeHtml(d.bemerkung)}</td>
-      <td><button class="danger" onclick="durchsichtLoeschen(${i})">✕</button></td>
-    </tr>
-  `).join("");
+  if (!volk || !volk.durchsichten?.length) return tb.innerHTML = "<tr><td colspan='10'>Keine Durchsichten.</td></tr>";
+  const sortiert = volk.durchsichten.map((d, index) => ({ d, index })).sort((a,b) => String(b.d.datum || '').localeCompare(String(a.d.datum || '')));
+  tb.innerHTML = sortiert.map(({d,index}) => {
+    const ampel = varroaBewertung(d.datum, d.varroa);
+    return `<tr>
+      <td>${datumAnzeigen(d.datum)}${d.wetter ? `<br><span class="small">${escapeHtml(d.wetter)}</span>` : ''}</td>
+      <td>${escapeHtml(d.staerke)}</td><td>${escapeHtml(d.brut)}</td><td>${escapeHtml(d.koenigin)}</td><td>${escapeHtml(d.futter)}</td>
+      <td>${d.varroa !== '' && d.varroa != null ? escapeHtml(d.varroa) : '–'}</td>
+      <td><span class="ampel-badge" style="background:${ampel.hintergrund};color:${ampel.farbe}">${escapeHtml(ampel.stufe)}</span></td>
+      <td>${escapeHtml(d.bemerkung)}${Array.isArray(d.fotos) && d.fotos.length ? `<div class="thumbs">${d.fotos.map(url => /^https?:\/\//i.test(url) ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener">📷 Foto öffnen</a>` : '').join('')}</div>` : ''}</td>
+      <td><button type="button" class="secondary" onclick="durchsichtBearbeiten(${index})">✎ Bearbeiten</button></td>
+      <td><button class="danger" onclick="durchsichtLoeschen(${index})">✕</button></td>
+    </tr>`;
+  }).join('');
 }
 
-function durchsichtLoeschen(i) {
-  const volk = daten.voelker.find(v => v.id === aktivesVolk);
-  if (volk && confirm("Löschen?")) { volk.durchsichten.splice(i, 1); speichern(); durchsichtenAnzeigen(); }
+function durchsichtLoeschen(index) {
+  const volk = daten.voelker.find(v => String(v.id) === String(aktivesVolk));
+  if (volk && confirm('Diese Durchsicht wirklich löschen?')) {
+    volk.durchsichten.splice(index, 1);
+    if (bearbeiteDurchsichtIndex === index) durchsichtFormZuruecksetzen();
+    speichern(); dashboardAnzeigen(); durchsichtenAnzeigen(); vergleichAnzeigen(); gesamtUebersichtAnzeigen();
+  }
 }
 
 function volkLoeschen() {
@@ -1012,17 +1500,39 @@ function behandlungVolkGewaehlt() {
     behandlungenAnzeigen(); 
   }
 }
+
 function behandlungSpeichern() {
   const id = Number(document.getElementById("bVolk").value);
   const volk = daten.voelker.find(v => v.id === id);
   if (!volk) return;
+  const anzahlRaw = document.getElementById("bAnzahl").value;
+  const milbenVorRaw = document.getElementById("bMilbenVor").value;
+  const milbenWaehrendRaw = document.getElementById("bMilbenWaehrend").value;
+  const milbenNachRaw = document.getElementById("bMilbenNach").value;
+  const anzahl = anzahlRaw === "" ? "" : Number(anzahlRaw);
+  const milbenVor = milbenVorRaw === "" ? "" : Number(milbenVorRaw);
+  const milbenWaehrend = milbenWaehrendRaw === "" ? "" : Number(milbenWaehrendRaw);
+  const milbenNach = milbenNachRaw === "" ? "" : Number(milbenNachRaw);
+  if (anzahl !== "" && (!Number.isInteger(anzahl) || anzahl < 0)) {
+    alert("Bitte bei Anzahl der Applikationen eine ganze Zahl ab 0 eingeben."); return;
+  }
+  if ([milbenVor, milbenWaehrend, milbenNach].some(w => w !== "" && (!Number.isFinite(w) || w < 0))) {
+    alert("Bitte bei den Milbenfall-Werten nichtnegative Zahlen eingeben."); return;
+  }
+  const beginn = document.getElementById("bBeginn").value || heute();
+  const ende = document.getElementById("bEnde").value;
+  if (ende && ende < beginn) { alert("Das Ende der Behandlung darf nicht vor dem Beginn liegen."); return; }
   volk.behandlungen.unshift({
-    beginn: document.getElementById("bBeginn").value || heute(), ende: document.getElementById("bEnde").value,
-    mittel: document.getElementById("bMittel").value, dosierung: document.getElementById("bDosierung").value,
+    beginn, ende,
+    mittel: document.getElementById("bMittel").value, art: document.getElementById("bArt").value, dosierung: document.getElementById("bDosierung").value,
+    anzahl, milbenVor, milbenWaehrend, milbenNach,
     bemerkung: document.getElementById("bBemerkung").value
   });
+  ["bMittel", "bArt", "bEnde", "bDosierung", "bAnzahl", "bMilbenVor", "bMilbenWaehrend", "bMilbenNach", "bBemerkung"].forEach(fid => { const el = document.getElementById(fid); if (el) el.value = ""; });
+  document.getElementById("bBeginn").value = heute();
   speichern(); behandlungenAnzeigen();
 }
+
 function behandlungenAnzeigen() {
   const sel = document.getElementById("bVolk");
   if (!sel || !sel.value) return;
@@ -1030,9 +1540,11 @@ function behandlungenAnzeigen() {
   const volk = daten.voelker.find(v => v.id === id);
   const tb = document.getElementById("behandlungen");
   if (!tb) return;
-  if (!volk || !volk.behandlungen.length) return tb.innerHTML = "<tr><td colspan='6'>Keine Behandlungen.</td></tr>";
-  tb.innerHTML = volk.behandlungen.map((b, i) => `<tr><td>${b.beginn}</td><td>${b.ende||"–"}</td><td>${escapeHtml(b.mittel)}</td><td>${escapeHtml(b.dosierung)}</td><td>${escapeHtml(b.bemerkung)}</td><td><button class="danger" onclick="behandlungLoeschen(${i})">✕</button></td></tr>`).join("");
+  if (!volk || !volk.behandlungen.length) return tb.innerHTML = "<tr><td colspan='11'>Keine Behandlungen.</td></tr>";
+  const wertAnzeigen = wert => wert !== undefined && wert !== null && wert !== "" ? escapeHtml(String(wert)) : "–";
+  tb.innerHTML = volk.behandlungen.map((b, i) => `<tr><td>${datumAnzeigen(b.beginn)}</td><td>${datumAnzeigen(b.ende)}</td><td>${escapeHtml(b.mittel || "–")}</td><td>${escapeHtml(b.art || "–")}</td><td>${escapeHtml(b.dosierung || "–")}</td><td>${wertAnzeigen(b.anzahl)}</td><td>${wertAnzeigen(b.milbenVor)}</td><td>${wertAnzeigen(b.milbenWaehrend)}</td><td>${wertAnzeigen(b.milbenNach)}</td><td>${escapeHtml(b.bemerkung || "–")}</td><td><button class="danger" onclick="behandlungLoeschen(${i})">✕</button></td></tr>`).join("");
 }
+
 function behandlungLoeschen(i) {
   const id = Number(document.getElementById("bVolk").value);
   const volk = daten.voelker.find(v => v.id === id);
@@ -1046,6 +1558,7 @@ function fuetterungVolkGewaehlt() {
     fuetterungenAnzeigen(); 
   }
 }
+
 function fuetterungSpeichern() {
   const id = Number(document.getElementById("fVolk").value);
   const volk = daten.voelker.find(v => v.id === id);
@@ -1056,6 +1569,7 @@ function fuetterungSpeichern() {
   });
   speichern(); fuetterungenAnzeigen();
 }
+
 function fuetterungenAnzeigen() {
   const sel = document.getElementById("fVolk");
   if (!sel || !sel.value) return;
@@ -1064,37 +1578,205 @@ function fuetterungenAnzeigen() {
   const tb = document.getElementById("fuetterungen");
   if (!tb) return;
   if (!volk || !volk.fuetterungen.length) return tb.innerHTML = "<tr><td colspan='5'>Keine Fütterungen.</td></tr>";
-  tb.innerHTML = volk.fuetterungen.map((f, i) => `<tr><td>${f.datum}</td><td>${f.menge} kg</td><td>${escapeHtml(f.form)}</td><td>${escapeHtml(f.bemerkung)}</td><td><button class="danger" onclick="fuetterungLoeschen(${i})">✕</button></td></tr>`).join("");
+  tb.innerHTML = volk.fuetterungen.map((f, i) => `<tr><td>${datumAnzeigen(f.datum)}</td><td>${f.menge} kg</td><td>${escapeHtml(f.form)}</td><td>${escapeHtml(f.bemerkung)}</td><td><button class="danger" onclick="fuetterungLoeschen(${i})">✕</button></td></tr>`).join("");
 }
+
 function fuetterungLoeschen(i) {
   const id = Number(document.getElementById("fVolk").value);
   const volk = daten.voelker.find(v => v.id === id);
   if (volk && confirm("Löschen?")) { volk.fuetterungen.splice(i, 1); speichern(); fuetterungenAnzeigen(); }
 }
 
+/* ---------- Aufgaben, Gewicht, Ernte, Königinnenhistorie & Zeitleiste ---------- */
+function managementAuswahlAktualisieren() {
+  const options = daten.voelker.map(v => `<option value="${v.id}">${escapeHtml(v.name)}${v.standort ? ' – '+escapeHtml(v.standort) : ''}</option>`).join('');
+  ['aVolk','gVolk','eVolk','qVolk'].forEach(id => { const el=document.getElementById(id); if(el) el.innerHTML = '<option value="">– Volk wählen –</option>'+options; });
+  const tv = document.getElementById('timelineVolk');
+  if (tv) { const val=tv.value; tv.innerHTML='<option value="">Alle Völker</option>'+options; if ([...tv.options].some(o=>o.value===val)) tv.value=val; }
+  const sf=document.getElementById('volkFilterStandort');
+  if (sf) { const val=sf.value; sf.innerHTML='<option value="">Alle Standorte</option>'+daten.standorte.map(s=>`<option value="${escapeHtml(s.name)}">${escapeHtml(s.name)}</option>`).join(''); if ([...sf.options].some(o=>o.value===val)) sf.value=val; }
+  const year=document.getElementById('timelineJahr');
+  if (year) {
+    const years=new Set();
+    daten.voelker.forEach(v=>['durchsichten','behandlungen','fuetterungen','gewichte','ernten'].forEach(k=>(v[k]||[]).forEach(x=>{const d=x.datum||x.beginn||x.ende;if(d)years.add(String(d).slice(0,4));})));
+    (daten.koeniginnenEreignisse||[]).forEach(x=>{if(x.datum)years.add(String(x.datum).slice(0,4));});
+    const val=year.value; year.innerHTML='<option value="">Alle Jahre</option>'+[...years].sort().reverse().map(y=>`<option>${y}</option>`).join(''); if ([...year.options].some(o=>o.value===val)) year.value=val;
+  }
+}
+
+function aufgabeSpeichern() {
+  const titel=document.getElementById('aTitel').value.trim();
+  if(!titel) return alert('Bitte eine Aufgabe eingeben.');
+  daten.aufgaben.push({id:Date.now(),volkId:document.getElementById('aVolk').value||'',faellig:document.getElementById('aFaellig').value||heute(),titel,prioritaet:document.getElementById('aPrioritaet').value||'Normal',erledigt:false,erstellt:heute()});
+  document.getElementById('aTitel').value=''; speichern(); managementAnzeigen();
+}
+
+function aufgabeUmschalten(id) { const a=daten.aufgaben.find(x=>String(x.id)===String(id)); if(a){a.erledigt=!a.erledigt;speichern();managementAnzeigen();} }
+function aufgabeLoeschen(id) { if(confirm('Aufgabe löschen?')){daten.aufgaben=daten.aufgaben.filter(x=>String(x.id)!==String(id));speichern();managementAnzeigen();} }
+
+function gewichtSpeichern(){
+  const volk=daten.voelker.find(v=>String(v.id)===String(document.getElementById('gVolk').value));
+  const gewicht=document.getElementById('gGewicht').value;
+  if(!volk) return alert('Bitte ein Volk auswählen.'); if(gewicht===''||!Number.isFinite(Number(gewicht))||Number(gewicht)<0)return alert('Bitte ein gültiges Gewicht eingeben.');
+  if(!Array.isArray(volk.gewichte))volk.gewichte=[];
+  volk.gewichte.push({id:Date.now(),datum:document.getElementById('gDatum').value||heute(),gewicht:Number(gewicht),bemerkung:document.getElementById('gBemerkung').value});
+  document.getElementById('gGewicht').value='';document.getElementById('gBemerkung').value='';speichern();managementAnzeigen();
+}
+
+function ernteSpeichern(){
+  const volkId=document.getElementById('eVolk').value; if(!volkId)return alert('Bitte ein Volk auswählen.');
+  const menge=document.getElementById('eMenge').value, kosten=document.getElementById('eKosten').value;
+  if(menge!==''&&Number(menge)<0||kosten!==''&&Number(kosten)<0)return alert('Menge und Kosten dürfen nicht negativ sein.');
+  daten.ernten.push({id:Date.now(),volkId,datum:document.getElementById('eDatum').value||heute(),sorte:document.getElementById('eSorte').value,menge:menge===''?'':Number(menge),kosten:kosten===''?'':Number(kosten),bemerkung:document.getElementById('eBemerkung').value});
+  ['eSorte','eMenge','eKosten','eBemerkung'].forEach(id=>document.getElementById(id).value='');speichern();managementAnzeigen();
+}
+
+function koeniginEreignisSpeichern(){
+  const volkId=document.getElementById('qVolk').value;if(!volkId)return alert('Bitte ein Volk auswählen.');
+  daten.koeniginnenEreignisse.push({id:Date.now(),volkId,datum:document.getElementById('qDatum').value||heute(),ereignis:document.getElementById('qEreignis').value,info:document.getElementById('qInfo').value,bemerkung:document.getElementById('qBemerkung').value});
+  document.getElementById('qInfo').value='';document.getElementById('qBemerkung').value='';speichern();managementAnzeigen();
+}
+
+function managementAnzeigen(){
+  datenstrukturAbsichern();
+  const today=heute();
+  const hints=[];
+  daten.voelker.forEach(v=>{
+    const ds=[...(v.durchsichten||[])].sort((a,b)=>String(b.datum||'').localeCompare(String(a.datum||'')));
+    if(!ds.length) hints.push({date:'',volk:v.name,text:'Erste Durchsicht dokumentieren',type:'info'});
+    else if(ds[0].datum && Math.floor((new Date(today+'T00:00:00')-new Date(ds[0].datum+'T00:00:00'))/86400000)>=21) hints.push({date:ds[0].datum,volk:v.name,text:'Durchsicht prüfen: letzte Dokumentation liegt mindestens 21 Tage zurück',type:'warn'});
+    const letzteBehandlung=[...(v.behandlungen||[])].sort((a,b)=>String(b.ende||b.beginn||'').localeCompare(String(a.ende||a.beginn||'')))[0];
+    if(letzteBehandlung && letzteBehandlung.ende){const tage=Math.floor((new Date(today+'T00:00:00')-new Date(letzteBehandlung.ende+'T00:00:00'))/86400000);if(tage>=0&&tage<=14)hints.push({date:letzteBehandlung.ende,volk:v.name,text:'Nachkontrolle nach Behandlung einplanen (Behandlungsende vor '+tage+' Tagen)',type:'warn'});}
+    if(ds[0]?.futter==='Sehr wenig') hints.push({date:ds[0].datum,volk:v.name,text:'Futtervorrat wurde zuletzt als „Sehr wenig“ dokumentiert',type:'warn'});
+    if(ds[0]?.koenigin==='Verdacht weisellos') hints.push({date:ds[0].datum,volk:v.name,text:'Verdacht auf Weisellosigkeit nachkontrollieren',type:'warn'});
+  });
+  const hi=document.getElementById('autoHinweise'); if(hi) hi.innerHTML=hints.length?hints.map(h=>`<div class="${h.type==='warn'?'warnung':'hinweis'}"><strong>${escapeHtml(h.volk)}</strong> · ${h.date?datumAnzeigen(h.date)+' · ':''}${escapeHtml(h.text)}</div>`).join(''):'<p class="hinweis">Aktuell keine automatischen Hinweise aus den erfassten Daten.</p>';
+  const tasks=document.getElementById('aufgabenListe'); if(tasks){const arr=[...(daten.aufgaben||[])].sort((a,b)=>String(a.faellig||'').localeCompare(String(b.faellig||'')));tasks.innerHTML=arr.length?arr.map(a=>{const v=daten.voelker.find(x=>String(x.id)===String(a.volkId));return `<div class="task-item ${a.erledigt?'done':''} ${!a.erledigt&&a.faellig<today?'overdue':''}"><div><strong>${escapeHtml(a.titel)}</strong><div class="small">${escapeHtml(v?.name||'Allgemein')} · Fällig: ${datumAnzeigen(a.faellig)} · Priorität: ${escapeHtml(a.prioritaet||'Normal')}</div></div><div class="actions" style="margin:0"><button class="secondary" onclick="aufgabeUmschalten(${a.id})">${a.erledigt?'Wieder öffnen':'Erledigt'}</button><button class="danger" onclick="aufgabeLoeschen(${a.id})">Löschen</button></div></div>`}).join(''):'<p>Noch keine eigenen Aufgaben angelegt.</p>';}
+  const weights=[]; daten.voelker.forEach(v=>(v.gewichte||[]).forEach(g=>weights.push({...g,volkName:v.name,volkId:v.id}))); weights.sort((a,b)=>String(b.datum).localeCompare(String(a.datum)));
+  zeichneGewichtsDiagramm();
+  const wt=document.getElementById('gewichtsTabelle'); if(wt)wt.innerHTML=weights.length?weights.map(g=>`<tr><td>${datumAnzeigen(g.datum)}</td><td>${escapeHtml(g.volkName)}</td><td>${escapeHtml(g.gewicht)} kg</td><td>${escapeHtml(g.bemerkung||'–')}</td><td><button class="danger" onclick="gewichtLoeschen(${g.volkId},${g.id})">✕</button></td></tr>`).join(''):'<tr><td colspan="5">Noch keine Gewichtsmessungen.</td></tr>';
+  const harvest=[...(daten.ernten||[])].sort((a,b)=>String(b.datum).localeCompare(String(a.datum))); const et=document.getElementById('ernteTabelle');
+  if(et)et.innerHTML=harvest.length?harvest.map(e=>{const v=daten.voelker.find(x=>String(x.id)===String(e.volkId));return `<tr><td>${datumAnzeigen(e.datum)}</td><td>${escapeHtml(v?.name||'–')}</td><td>${escapeHtml(e.sorte||'–')}</td><td>${e.menge!==''&&e.menge!=null?escapeHtml(e.menge):'–'}</td><td>${e.kosten!==''&&e.kosten!=null?Number(e.kosten).toFixed(2):'–'}</td><td>${escapeHtml(e.bemerkung||'–')}</td><td><button class="danger" onclick="ernteLoeschen(${e.id})">✕</button></td></tr>`}).join(''):'<tr><td colspan="7">Noch keine Ernten eingetragen.</td></tr>';
+  const totalKg=harvest.reduce((n,e)=>n+(Number(e.menge)||0),0), totalKosten=harvest.reduce((n,e)=>n+(Number(e.kosten)||0),0); const sums=document.getElementById('ernteSummen'); if(sums)sums.innerHTML=`<div class="kpi"><small>Erntemenge gesamt</small><strong>${totalKg.toFixed(1)} kg</strong></div><div class="kpi"><small>Erfasste Kosten</small><strong>${totalKosten.toFixed(2)} €</strong></div>`;
+  const qe=[...(daten.koeniginnenEreignisse||[])].sort((a,b)=>String(b.datum).localeCompare(String(a.datum))); const qt=document.getElementById('koeniginTabelle'); if(qt)qt.innerHTML=qe.length?qe.map(q=>{const v=daten.voelker.find(x=>String(x.id)===String(q.volkId));return `<tr><td>${datumAnzeigen(q.datum)}</td><td>${escapeHtml(v?.name||'–')}</td><td>${escapeHtml(q.ereignis)}</td><td>${escapeHtml(q.info||'–')}</td><td>${escapeHtml(q.bemerkung||'–')}</td><td><button class="danger" onclick="koeniginEreignisLoeschen(${q.id})">✕</button></td></tr>`}).join(''):'<tr><td colspan="6">Noch keine Königinnenereignisse.</td></tr>';
+  zeitleisteAnzeigen();
+}
+
+function zeichneGewichtsDiagramm(){
+  const canvas=document.getElementById('gewichtChart'); if(!canvas)return;
+  const id=document.getElementById('gVolk')?.value; const volk=daten.voelker.find(v=>String(v.id)===String(id));
+  const rect=canvas.getBoundingClientRect(); const w=Math.max(300,rect.width||600),h=Math.max(180,rect.height||320),dpr=window.devicePixelRatio||1;
+  canvas.width=w*dpr;canvas.height=h*dpr;const ctx=canvas.getContext('2d');ctx.scale(dpr,dpr);ctx.clearRect(0,0,w,h);
+  const pts=(volk?.gewichte||[]).filter(x=>Number.isFinite(Number(x.gewicht))&&x.datum).sort((a,b)=>String(a.datum).localeCompare(String(b.datum)));
+  if(!pts.length){ctx.fillStyle='#7a7057';ctx.font='14px system-ui';ctx.textAlign='center';ctx.fillText('Noch keine Gewichtsmessungen für dieses Volk.',w/2,h/2);return;}
+  const pad={l:42,r:18,t:18,b:38},pw=w-pad.l-pad.r,ph=h-pad.t-pad.b;const vals=pts.map(x=>Number(x.gewicht));let min=Math.min(...vals),max=Math.max(...vals);if(min===max){min=Math.max(0,min-1);max=max+1;}else{min=Math.max(0,min-(max-min)*.12);max=max+(max-min)*.12;}
+  ctx.strokeStyle='#ded6c4';ctx.fillStyle='#766b55';ctx.font='11px system-ui';ctx.lineWidth=1;
+  for(let i=0;i<=4;i++){const y=pad.t+ph*i/4;ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(w-pad.r,y);ctx.stroke();ctx.textAlign='right';ctx.fillText((max-(max-min)*i/4).toFixed(1),pad.l-7,y+4);}
+  const x=i=>pad.l+(pts.length===1?pw/2:i*pw/(pts.length-1));const y=v=>pad.t+(max-v)*ph/(max-min);
+  ctx.strokeStyle='#c58a13';ctx.lineWidth=2.5;ctx.beginPath();pts.forEach((p,i)=>i?ctx.lineTo(x(i),y(Number(p.gewicht))):ctx.moveTo(x(i),y(Number(p.gewicht))));ctx.stroke();
+  pts.forEach((p,i)=>{ctx.fillStyle='#2d2a23';ctx.beginPath();ctx.arc(x(i),y(Number(p.gewicht)),3.5,0,Math.PI*2);ctx.fill();});
+  ctx.textAlign='center';ctx.fillStyle='#766b55';if(pts.length<=8)pts.forEach((p,i)=>ctx.fillText(datumAnzeigen(p.datum),x(i),h-12));else{ctx.fillText(datumAnzeigen(pts[0].datum),pad.l,h-12);ctx.fillText(datumAnzeigen(pts[pts.length-1].datum),w-pad.r,h-12);}
+}
+
+function gewichtLoeschen(volkId,id){const v=daten.voelker.find(x=>String(x.id)===String(volkId));if(v&&confirm('Gewichtsmessung löschen?')){v.gewichte=(v.gewichte||[]).filter(x=>String(x.id)!==String(id));speichern();managementAnzeigen();}}
+function ernteLoeschen(id){if(confirm('Ernteeintrag löschen?')){daten.ernten=(daten.ernten||[]).filter(x=>String(x.id)!==String(id));speichern();managementAnzeigen();}}
+function koeniginEreignisLoeschen(id){if(confirm('Königinnenereignis löschen?')){daten.koeniginnenEreignisse=(daten.koeniginnenEreignisse||[]).filter(x=>String(x.id)!==String(id));speichern();managementAnzeigen();}}
+
+function zeitleisteAnzeigen(){
+  const target=document.getElementById('zeitleiste');if(!target)return;
+  const volkFilter=document.getElementById('timelineVolk')?.value||'', yearFilter=document.getElementById('timelineJahr')?.value||''; const events=[];
+  const add=(date,volk,type,detail)=>{if(!date|| (volkFilter&&String(volk.id)!==String(volkFilter)) || (yearFilter&&String(date).slice(0,4)!==yearFilter))return;events.push({date,volk:volk.name,type,detail});};
+  daten.voelker.forEach(v=>{(v.durchsichten||[]).forEach(x=>add(x.datum,v,'Durchsicht',`${x.staerke||'Stärke offen'} · Varroa ${x.varroa||'–'} Milben/Tag ${x.bemerkung?'· '+x.bemerkung:''}`));(v.behandlungen||[]).forEach(x=>add(x.beginn||x.ende,v,'Behandlung',`${x.mittel||'Mittel offen'} · ${x.art||''}`));(v.fuetterungen||[]).forEach(x=>add(x.datum,v,'Fütterung',`${x.menge||'–'} kg · ${x.form||''}`));(v.gewichte||[]).forEach(x=>add(x.datum,v,'Gewicht',`${x.gewicht} kg`));});
+  (daten.ernten||[]).forEach(x=>{const v=daten.voelker.find(y=>String(y.id)===String(x.volkId))||{id:'',name:'Unbekannt'};add(x.datum,v,'Honigernte',`${x.menge||'–'} kg · ${x.sorte||''}`)});
+  (daten.koeniginnenEreignisse||[]).forEach(x=>{const v=daten.voelker.find(y=>String(y.id)===String(x.volkId))||{id:'',name:'Unbekannt'};add(x.datum,v,'Königin',`${x.ereignis} · ${x.info||''}`)});
+  events.sort((a,b)=>String(b.date).localeCompare(String(a.date))); target.innerHTML=events.length?events.map(e=>`<div class="event-item"><strong>${datumAnzeigen(e.date)} · ${escapeHtml(e.type)}</strong><div class="small">${escapeHtml(e.volk)}</div><div>${escapeHtml(e.detail)}</div></div>`).join(''):'<p>Für die gewählten Filter gibt es noch keine Ereignisse.</p>';
+}
+
+function exportCsv(){
+  const rows=[['Typ','Datum','Volk','Standort','Details']];
+  daten.voelker.forEach(v=>{(v.durchsichten||[]).forEach(x=>rows.push(['Durchsicht',x.datum,v.name,v.standort,[x.staerke,x.brut,x.koenigin,x.futter,'Varroa/Tag: '+(x.varroa||''),x.bemerkung].join(' | ')]));(v.behandlungen||[]).forEach(x=>rows.push(['Behandlung',x.beginn,v.name,v.standort,[x.ende,x.mittel,x.art,x.dosierung,'Applikationen: '+(x.anzahl??''),'Vor: '+(x.milbenVor??''),'Während: '+(x.milbenWaehrend??''),'Nach: '+(x.milbenNach??''),x.bemerkung].join(' | ')]));(v.fuetterungen||[]).forEach(x=>rows.push(['Fütterung',x.datum,v.name,v.standort,[x.menge+' kg',x.form,x.bemerkung].join(' | ')]));(v.gewichte||[]).forEach(x=>rows.push(['Gewicht',x.datum,v.name,v.standort,[x.gewicht+' kg',x.bemerkung].join(' | ')]));});
+  (daten.ernten||[]).forEach(x=>{const v=daten.voelker.find(y=>String(y.id)===String(x.volkId));rows.push(['Ernte',x.datum,v?.name||'',v?.standort||'',[x.sorte,x.menge+' kg','Kosten: '+x.kosten,x.bemerkung].join(' | ')]);});
+  (daten.koeniginnenEreignisse||[]).forEach(x=>{const v=daten.voelker.find(y=>String(y.id)===String(x.volkId));rows.push(['Königin',x.datum,v?.name||'',v?.standort||'',[x.ereignis,x.info,x.bemerkung].join(' | ')]);});
+  const csv='\ufeff'+rows.map(r=>r.map(v=>'"'+String(v??'').replaceAll('"','""')+'"').join(';')).join('\r\n'); const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}); const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='bienenbuch-export-'+heute()+'.csv';a.click();URL.revokeObjectURL(a.href);
+}
+
 function vergleichAnzeigen() {
-  const tb = document.getElementById("vergleichTabelle");
-  if (!tb) return;
+  const tbody = document.getElementById("vergleichTabelle");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+
   if (!daten.voelker.length) {
-    tb.innerHTML = `<tr><td colspan="9">Noch keine Völker angelegt.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9">Noch keine Völker angelegt.</td></tr>`;
+    zeichneVergleichsDiagramm();
     return;
   }
-  tb.innerHTML = daten.voelker.map(volk => {
-    const letzte = volk.durchsichten[0];
-    return `
-      <tr>
-        <td><strong>${escapeHtml(volk.name)}</strong></td>
-        <td>${escapeHtml(volk.standort || "–")}</td>
-        <td>${letzte ? escapeHtml(letzte.datum) : "–"}</td>
-        <td>${letzte && letzte.staerke ? escapeHtml(letzte.staerke) : "–"}</td>
-        <td>${letzte && letzte.futter ? escapeHtml(letzte.futter) : "–"}</td>
-        <td>${letzte && letzte.varroa ? escapeHtml(letzte.varroa) + " / Tag" : "–"}</td>
-        <td>–</td>
-        <td><span class="ampel-badge" style="background:#e8f5e9;color:#2e7d32">Grün</span></td>
-        <td><button onclick="volkOeffnen(${volk.id})">Öffnen</button></td>
-      </tr>
+
+  daten.voelker.forEach(volk => {
+    const ds = [...volk.durchsichten].sort((a, b) => a.datum.localeCompare(b.datum));
+    const letzte = ds[ds.length - 1];
+
+    const varroaWerte = ds
+      .filter(d => d.varroa !== "" && d.varroa !== null && !isNaN(parseFloat(d.varroa)))
+      .map(d => parseFloat(d.varroa));
+
+    const letzteVarroa = varroaWerte.length ? varroaWerte[varroaWerte.length - 1] : null;
+    const vorherigeVarroa = varroaWerte.length > 1 ? varroaWerte[varroaWerte.length - 2] : null;
+
+    const letzteMessung = [...ds]
+      .reverse()
+      .find(d => d.varroa !== "" && d.varroa !== null && !isNaN(parseFloat(d.varroa)));
+
+    let trend = "–";
+    let trendFarbe = "#7a7057";
+
+    if (letzteVarroa !== null && vorherigeVarroa !== null) {
+      if (letzteVarroa > vorherigeVarroa) {
+        trend = "steigend ▲";
+        trendFarbe = "#b3261e";
+      } else if (letzteVarroa < vorherigeVarroa) {
+        trend = "fallend ▼";
+        trendFarbe = "#2e7d32";
+      } else {
+        trend = "gleichbleibend ●";
+      }
+    }
+
+    const ampel = letzteMessung
+      ? varroaBewertung(letzteMessung.datum, letzteMessung.varroa)
+      : varroaBewertung("", "");
+
+    let bewertung = ampel.stufe;
+    let bewertungsFarbe = ampel.farbe;
+    let bewertungsHintergrund = ampel.hintergrund;
+
+    if (ampel.stufe !== "Rot" && letzte && letzte.futter === "Sehr wenig") {
+      bewertung = "Futter kritisch";
+      bewertungsFarbe = "#b3261e";
+      bewertungsHintergrund = "#ffebee";
+    }
+
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><strong>${escapeHtml(volk.name)}</strong></td>
+      <td>${escapeHtml(volk.standort || "–")}</td>
+      <td>${letzte ? escapeHtml(datumAnzeigen(letzte.datum)) : "–"}</td>
+      <td>${letzte && letzte.staerke ? escapeHtml(letzte.staerke) : "–"}</td>
+      <td>${letzte && letzte.futter ? escapeHtml(letzte.futter) : "–"}</td>
+      <td>${letzteVarroa !== null ? letzteVarroa + " / Tag" : "–"}</td>
+      <td style="color:${trendFarbe};font-weight:700">${trend}</td>
+      <td>
+        <span class="ampel-badge" style="background:${bewertungsHintergrund};color:${bewertungsFarbe};">
+          ${escapeHtml(bewertung)}
+        </span>
+        <br>
+        <span class="small">${escapeHtml(ampel.richtwert)}</span>
+      </td>
+      <td><button onclick="volkOeffnen(${volk.id})">Öffnen</button></td>
     `;
-  }).join("");
+    tbody.appendChild(tr);
+  });
+
+  zeichneVergleichsDiagramm();
 }
 
 function alleAnzeigen() {
@@ -1102,6 +1784,7 @@ function alleAnzeigen() {
   aktualisiereStandortAuswahl();
   standorteAnzeigen();
   aktualisiereVolkAuswahl();
+  managementAuswahlAktualisieren();
   gesamtUebersichtAnzeigen();
   herkunftGesamtTabelleAnzeigen();
   vergleichAnzeigen();
@@ -1132,6 +1815,17 @@ function importJson(e) {
   reader.readAsText(datei);
 }
 
+document.addEventListener('DOMContentLoaded', () => {
+  ['gDatum','eDatum','qDatum','aFaellig'].forEach(id=>{const el=document.getElementById(id);if(el&&!el.value)el.value=heute();});
+  managementAuswahlAktualisieren();
+});
+
+window.addEventListener("resize", () => {
+  if (typeof daten === "undefined") return;
+  if (aktuellerReiter === "dashboard") vergleichAnzeigen();
+  if (aktuellerReiter === "stockkarte" && aktivesVolk !== null) dashboardAnzeigen();
+});
+
 function escapeHtml(text) {
   return String(text ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
 }
@@ -1139,9 +1833,6 @@ function escapeHtml(text) {
 
 </body>
 </html>
-```
+```eof
 
-### Neue Funktionen auf einen Blick:
-1. **Standort bearbeiten (✏️-Button):** Klicke in der Liste "Meine Bienenstände" auf das Stift-Symbol, um den Standort zu laden.
-2. **Karten-Anpassung:** Beim Bearbeiten springt die Karte automatisch zu den aktuellen GPS-Koordinaten des Standorts. Du kannst durch erneutes Klicken auf die Karte neue Koordinaten festlegen oder diese per Hand eingeben.
-3. **Automatische Verknüpfung:** Wenn du den Namen eines Standorts änderst, werden auch alle zugeordneten Völker automatisch auf den neuen Standortnamen aktualisiert.
+Die zusammengeführte `index.html` ist einsatzbereit. Du kannst die Datei direkt speichern oder kopieren!
